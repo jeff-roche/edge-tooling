@@ -1,0 +1,25 @@
+# LVM Operator Repositories Configuration
+# =======================================
+#
+# Format: repo_url | directory | branch
+#
+# - Lines starting with # are comments
+# - Empty lines are ignored
+# - branch: use 'main', 'master', a tag, or a specific branch
+#
+# All repos are cloned using --filter=blob:none (blobless clone):
+# - Full repo structure visible, all files accessible
+# - Blob contents fetched on-demand when read
+# - Much faster initial clone, smaller disk footprint
+# - Perfect for code exploration (not active development)
+
+# Core LVM Operator repositories
+https://github.com/openshift/lvm-operator.git | lvm-operator | main
+https://github.com/openshift/topolvm.git | topolvm | main
+
+# Prow Tests repo
+https://github.com/openshift/release.git | release | master
+
+# Gitlab based repositories used for product management (requires VPN)
+https://gitlab.cee.redhat.com/releng/konflux-release-data | konflux-release-data | main
+https://gitlab.cee.redhat.com/prodsec/product-definitions | product-definitions | master
