@@ -6,6 +6,17 @@
         "hooks": [
           {
             "type": "command",
+            "command": ".claude/hooks/update-submodules.sh",
+            "timeout": 30,
+            "statusMessage": "Checking for submodule updates..."
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
             "command": ".claude/hooks/detect-new-tools.sh",
             "timeout": 10,
             "statusMessage": "Checking for new tool directories..."
