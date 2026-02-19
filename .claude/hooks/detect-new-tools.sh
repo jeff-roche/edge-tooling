@@ -4,6 +4,12 @@
 
 set -euo pipefail
 
+# Require jq for JSON parsing
+if ! command -v jq &>/dev/null; then
+    echo "Error: jq is required but not installed. Install it with your package manager (e.g., 'sudo dnf install jq')." >&2
+    exit 1
+fi
+
 # Read hook input
 INPUT=$(cat)
 CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
