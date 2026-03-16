@@ -19,7 +19,7 @@ repos:
 
   - name: release
     url: https://github.com/openshift/release.git
-    branch: master
+    branch: main
     category: testing
     summary: "CI/CD configuration — Prow jobs and test workflows for LVMS"
 
