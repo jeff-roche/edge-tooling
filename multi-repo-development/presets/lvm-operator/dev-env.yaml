@@ -12,25 +12,25 @@ repos:
     summary: "Core operator source — bundle, must-gather, Tekton pipelines, tests"
 
   - name: topolvm
-    url: https://github.com/topolvm/topolvm.git
+    url: https://github.com/openshift/topolvm.git
     branch: main
     category: development
     summary: "Underlying CSI driver that LVM Operator imports to manage host LVM"
 
   - name: release
     url: https://github.com/openshift/release.git
-    branch: main
+    branch: master
     category: testing
     summary: "CI/CD configuration — Prow jobs and test workflows for LVMS"
 
   - name: konflux-release-data
-    url: https://github.com/redhat-appstudio/konflux-release-data.git
+    url: https://gitlab.cee.redhat.com/releng/konflux-release-data
     branch: main
     category: deployment
     summary: "Konflux build/release orchestration — staging and production pipelines"
 
   - name: product-definitions
-    url: https://github.com/redhat-appstudio/product-definitions.git
-    branch: main
+    url: https://gitlab.cee.redhat.com/prodsec/product-definitions
+    branch: master
     category: deployment
     summary: "Product Security gatekeeper — approved LVMS versions and CPE definitions"
