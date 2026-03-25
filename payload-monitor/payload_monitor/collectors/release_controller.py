@@ -1,11 +1,13 @@
 """Fetch nightly payload data from the amd64 release controller."""
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
 
 import requests
 
 from ..config import Config
+from .http import create_session
 from ..models import (
     JobResult,
     JobRun,
@@ -25,6 +27,8 @@ STREAMS_URL = f"{BASE_URL}/api/v1/releasestreams/accepted"
 
 # Fallback versions if auto-discovery fails
 FALLBACK_VERSIONS = ["4.18", "4.19", "4.20", "4.21", "4.22", "4.23", "5.0"]
+
+_session = create_session()
 
 # Only monitor versions >= this threshold
 MIN_VERSION = (4, 18)
@@ -54,19 +58,12 @@ def _parse_phase(phase: str) -> PayloadStatus:
     return PayloadStatus.PENDING
 
 
-def _classify_topology(job_name: str, config: Config) -> Optional[str]:
-    for topo in config.topologies:
-        if topo.matches(job_name):
-            return topo.name
-    return None
-
-
 def _parse_jobs(
     jobs_dict: dict, job_type: JobType, config: Config
 ) -> list[JobRun]:
     runs = []
     for name, info in jobs_dict.items():
-        topology = _classify_topology(name, config)
+        topology = config.classify_topology(name)
         runs.append(JobRun(
             name=name,
             url=info.get("url", ""),
@@ -89,7 +86,7 @@ def _parse_version_tuple(version: str) -> tuple[int, ...]:
 def _discover_from_sippy() -> list[str]:
     """Discover versions from the Sippy releases API."""
     try:
-        resp = requests.get(SIPPY_RELEASES_URL, timeout=15)
+        resp = _session.get(SIPPY_RELEASES_URL, timeout=15)
         resp.raise_for_status()
         data = resp.json()
         releases = data.get("releases", [])
@@ -109,7 +106,7 @@ def _discover_from_sippy() -> list[str]:
 def _discover_from_release_controller() -> list[str]:
     """Discover versions from the release controller's nightly streams."""
     try:
-        resp = requests.get(STREAMS_URL, timeout=15)
+        resp = _session.get(STREAMS_URL, timeout=15)
         resp.raise_for_status()
         data = resp.json()
     except requests.RequestException as e:
@@ -133,8 +130,11 @@ def _auto_discover_versions() -> list[str]:
     streams are found (Sippy may lag behind the release controller for
     newer versions like 4.23 and 5.0).
     """
-    sippy_versions = _discover_from_sippy()
-    rc_versions = _discover_from_release_controller()
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        sippy_future = pool.submit(_discover_from_sippy)
+        rc_future = pool.submit(_discover_from_release_controller)
+        sippy_versions = sippy_future.result()
+        rc_versions = rc_future.result()
 
     # Merge and deduplicate
     all_versions = list(set(sippy_versions + rc_versions))
@@ -167,7 +167,7 @@ def fetch_tags(stream: str, limit: int = 5) -> list[dict]:
     url = TAGS_URL.format(stream=stream)
     logger.info(f"Fetching tags from {url}")
     try:
-        resp = requests.get(url, timeout=30)
+        resp = _session.get(url, timeout=30)
         resp.raise_for_status()
         data = resp.json()
     except requests.RequestException as e:
@@ -189,7 +189,7 @@ def fetch_release_detail(stream: str, tag: str) -> Optional[dict]:
     url = RELEASE_URL.format(stream=stream, tag=tag)
     logger.debug(f"Fetching release detail from {url}")
     try:
-        resp = requests.get(url, timeout=30)
+        resp = _session.get(url, timeout=30)
         resp.raise_for_status()
         return resp.json()
     except requests.RequestException as e:
@@ -224,32 +224,53 @@ def fetch_payload(stream: str, tag_data: dict, config: Config) -> Payload:
     )
 
 
-def collect(config: Config) -> list[StreamReport]:
-    """Collect payload data for all configured streams."""
-    streams = discover_streams(config)
-    reports = []
+def _collect_stream(stream: str, config: Config) -> StreamReport:
+    """Collect payload data for a single stream, parallelizing tag fetches."""
+    version = stream.split(".0-0.nightly")[0]
+    logger.info(f"Collecting payloads for {stream}")
+    tags = fetch_tags(stream, limit=config.payloads_per_stream)
 
-    for stream in streams:
-        version = stream.split(".0-0.nightly")[0]
-        logger.info(f"Collecting payloads for {stream}")
-        tags = fetch_tags(stream, limit=config.payloads_per_stream)
-
-        payloads = []
-        for tag_data in tags:
-            payload = fetch_payload(stream, tag_data, config)
-            edge_jobs = payload.edge_jobs
-            if edge_jobs:
-                failing = [j for j in edge_jobs if j.result == JobResult.FAILURE]
-                logger.info(
-                    f"  {payload.tag}: {payload.phase} — "
-                    f"{len(edge_jobs)} edge jobs, {len(failing)} failing"
-                )
+    # Fetch all tag details in parallel
+    payloads = []
+    with ThreadPoolExecutor(max_workers=len(tags) or 1) as pool:
+        futures = {
+            pool.submit(fetch_payload, stream, tag_data, config): tag_data
+            for tag_data in tags
+        }
+        for future in as_completed(futures):
+            payload = future.result()
             payloads.append(payload)
 
-        reports.append(StreamReport(
-            stream=stream,
-            version=version,
-            payloads=payloads,
-        ))
+    # Restore chronological order (tags are newest-first from the API)
+    tag_order = {t["name"]: i for i, t in enumerate(tags)}
+    payloads.sort(key=lambda p: tag_order.get(p.tag, 0))
 
-    return reports
+    for payload in payloads:
+        edge_jobs = payload.edge_jobs
+        if edge_jobs:
+            failing = payload.failing_edge_jobs
+            logger.info(
+                f"  {payload.tag}: {payload.phase} — "
+                f"{len(edge_jobs)} edge jobs, {len(failing)} failing"
+            )
+
+    return StreamReport(stream=stream, version=version, payloads=payloads)
+
+
+def collect(config: Config, streams: list[str] | None = None) -> list[StreamReport]:
+    """Collect payload data for all configured streams in parallel."""
+    if streams is None:
+        streams = discover_streams(config)
+
+    with ThreadPoolExecutor(max_workers=len(streams) or 1) as pool:
+        futures = {
+            pool.submit(_collect_stream, stream, config): stream
+            for stream in streams
+        }
+        reports = {}
+        for future in as_completed(futures):
+            stream = futures[future]
+            reports[stream] = future.result()
+
+    # Preserve original stream order
+    return [reports[s] for s in streams]

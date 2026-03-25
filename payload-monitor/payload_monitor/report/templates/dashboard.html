@@ -14,12 +14,12 @@
     <div class="meta">SNO / TNA / TNF topology health across OpenShift nightly payloads</div>
   </div>
   <div style="text-align:right">
+    <div class="meta"><a href="https://github.com/openshift-eng/edge-tooling" target="_blank" style="color:var(--text-muted)">View source on GitHub ↗</a></div>
     <div class="meta">Generated: {{ report.generated_at }}</div>
     {% set has_ai = [] %}{% for item in all_failing %}{% if item.job.deep_analysis %}{% if has_ai.append(1) %}{% endif %}{% endif %}{% endfor %}
     {% if has_ai %}
     <div class="meta" style="margin-top:4px">
       <span style="color:var(--green)">● AI-enriched via Claude</span>
-      {% if report.ai_cost %}<span style="margin-left:6px">({{ report.ai_cost }})</span>{% endif %}
     </div>
     {% else %}
     <div class="meta" style="margin-top:4px">
@@ -40,7 +40,7 @@
   <span class="skip-flag">--skip-sippy</span> Sippy regression check was skipped — Sippy Job Regressions section is not available.
   {% endif %}
   {% if report.skip_jira %}
-  <span class="skip-flag">JIRA_TOKEN not set</span> JIRA integration is disabled — Related JIRA Bugs and bug matching are not available. Set the <code>JIRA_TOKEN</code> environment variable to enable.
+  <span class="skip-flag">JIRA_TOKEN</span> not set - JIRA integration is disabled. Set the <code>JIRA_TOKEN</code> env variable to enable related JIRA Bugs and Bug matching.
   {% endif %}
 </div>
 {% endif %}
@@ -86,7 +86,7 @@
           {% if failing_count == 0 %}Healthy{% elif failing_count <= 2 %}Degraded{% else %}Failing{% endif %}
         </div>
         <div class="detail">
-          Latest: {{ latest.phase }}
+          Latest: <span style="color:{% if latest.phase == 'Accepted' %}var(--green){% elif latest.phase == 'Rejected' %}var(--red){% else %}var(--text-muted){% endif %}">{{ latest.phase }}</span>
           <br>{{ failing_count }} edge failure{{ 's' if failing_count != 1 else '' }} in last {{ stream.payloads | length }} builds
         </div>
         {% else %}
@@ -224,7 +224,7 @@
     <tr class="job-row" data-topology="{{ item.job.topology }}" data-jobtype="{{ item.job.job_type.value }}" data-version="{{ item.version }}" data-row-index="{{ loop.index }}">
       <td><a href="{{ item.job.prow_url }}" target="_blank">{{ item.job.name }}</a></td>
       <td>{{ item.version }}</td>
-      <td><a href="{{ item.payload_url }}" target="_blank">{{ item.payload_tag | truncate(30) }}</a></td>
+      <td><a href="{{ item.payload_url }}" target="_blank">{{ item.payload_tag }}</a></td>
       <td><span class="badge {{ item.job.topology | lower }}">{{ item.job.topology }}</span></td>
       <td><span class="badge {{ item.job.job_type.value }}">{{ item.job.job_type.value }}</span></td>
       <td style="white-space:nowrap;font-size:12px;color:var(--text-muted)">{{ item.date }}</td>
@@ -318,13 +318,13 @@
 <div class="filters">
   <span style="color:var(--text-muted);font-size:12px;padding:4px 0">Topology:</span>
   <button class="filter-btn active" data-group="regtopology" data-value="all">All</button>
-  {% for topo in topologies %}
+  {% for topo in reg_topologies %}
   <button class="filter-btn" data-group="regtopology" data-value="{{ topo }}">{{ topo }}</button>
   {% endfor %}
 
   <span style="color:var(--text-muted);font-size:12px;padding:4px 0;margin-left:12px">Version:</span>
   <button class="filter-btn active" data-group="regversion" data-value="all">All</button>
-  {% for v in versions %}
+  {% for v in reg_versions %}
   <button class="filter-btn" data-group="regversion" data-value="{{ v }}">{{ v }}</button>
   {% endfor %}
 </div>
@@ -343,7 +343,7 @@
   <tbody>
     {% for r in all_regressions %}
     <tr class="regression-row sortable-row" data-row-index="{{ loop.index }}" data-regtopology="{{ r.topology }}" data-regversion="{{ r.version }}">
-      <td><a href="{{ r.triage_url }}" target="_blank">{{ r.test_name | truncate(80) }}</a></td>
+      <td><a href="{{ r.triage_url }}" target="_blank">{{ r.test_name }}</a></td>
       <td><span class="badge {{ r.topology | lower }}">{{ r.topology }}</span></td>
       <td>{{ r.version }}</td>
       <td>{{ r.current_runs }}</td>
@@ -407,9 +407,9 @@
       <td>{{ cr.component }}</td>
       <td>
         {% if cr.detail_url %}
-        <a href="{{ cr.detail_url }}" target="_blank">{{ cr.test_name | truncate(70) }}</a>
+        <a href="{{ cr.detail_url }}" target="_blank">{{ cr.test_name }}</a>
         {% else %}
-        {{ cr.test_name | truncate(70) }}
+        {{ cr.test_name }}
         {% endif %}
       </td>
       <td>{{ cr.version }}</td>
@@ -469,20 +469,21 @@
 <!-- Suggested Bugs -->
 {% if report.suggested_bugs %}
 <h2>Suggested New Bugs</h2>
-<div class="meta" style="margin-bottom:8px">Failing edge jobs (SNO/TNA/TNF) with no existing JIRA bug matching the job name in summary or description. Deduplicated by job name across payloads.</div>
+<div class="meta" style="margin-bottom:8px">Failing edge jobs (SNO/TNA/TNF) with no existing JIRA bug matching the job name. Deduplicated by job name across payloads and versions.</div>
 {% for bug in report.suggested_bugs %}
 <div class="suggest-card">
   <div class="title">{{ bug.title }}</div>
   <div class="meta">
     <span class="badge {{ bug.topology | lower }}">{{ bug.topology }}</span>
-    {{ bug.version }} | {{ bug.job_name }}
+    {% for v in bug.versions %}<span class="badge" style="background:rgba(88,166,255,0.15);color:var(--accent)">{{ v }}</span> {% endfor %}
+    {{ bug.job_name }}
   </div>
   {% if bug.failing_tests %}
   <div class="tests">
     Failing tests:
     <ul>
     {% for t in bug.failing_tests[:3] %}
-      <li>{{ t }}</li>
+      <li><code style="font-size:12px">{{ t }}</code></li>
     {% endfor %}
     {% if bug.failing_tests | length > 3 %}
       <li>... and {{ bug.failing_tests | length - 3 }} more</li>

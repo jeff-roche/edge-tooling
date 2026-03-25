@@ -3,11 +3,13 @@
 import logging
 import os
 import urllib.parse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
 
 import requests
 
 from ..config import Config
+from .http import create_session
 from ..models import JiraBug, JobRun, SuggestedBug
 
 logger = logging.getLogger(__name__)
@@ -15,13 +17,7 @@ logger = logging.getLogger(__name__)
 JIRA_BASE = "https://issues.redhat.com"
 SEARCH_URL = f"{JIRA_BASE}/rest/api/2/search"
 
-
-def _get_auth() -> Optional[tuple[str, str]]:
-    """Get JIRA auth from environment variables."""
-    token = os.environ.get("JIRA_TOKEN")
-    if token:
-        return None  # Use bearer token instead
-    return None
+_session = create_session()
 
 
 def _get_headers() -> dict:
@@ -33,7 +29,7 @@ def _get_headers() -> dict:
     return headers
 
 
-def _has_auth() -> bool:
+def has_auth() -> bool:
     return bool(os.environ.get("JIRA_TOKEN"))
 
 
@@ -43,7 +39,7 @@ def search_bugs(
     max_results: int = 5,
 ) -> list[JiraBug]:
     """Search JIRA for bugs matching a failing job name."""
-    if not _has_auth():
+    if not has_auth():
         logger.debug("JIRA_TOKEN not set, skipping JIRA search")
         return []
 
@@ -58,7 +54,7 @@ def search_bugs(
     )
 
     try:
-        resp = requests.get(
+        resp = _session.get(
             SEARCH_URL,
             params={"jql": jql, "maxResults": max_results, "fields": "summary,status,assignee,priority,components"},
             headers=_get_headers(),
@@ -94,21 +90,28 @@ def search_bugs(
 def search_bugs_for_jobs(
     failing_jobs: list[JobRun],
     config: Config,
+    max_workers: int = 4,
 ) -> dict[str, list[JiraBug]]:
     """Search JIRA for bugs matching each failing job.
 
     Returns a dict mapping job name -> list of matching bugs.
     """
-    if not _has_auth():
+    if not has_auth():
         logger.info("JIRA_TOKEN not set — JIRA bug matching disabled")
         return {}
 
     results = {}
-    for job in failing_jobs:
-        bugs = search_bugs(job.name, config)
-        if bugs:
-            logger.info(f"  Found {len(bugs)} JIRA bugs for {job.name}")
-            results[job.name] = bugs
+
+    def _search(job: JobRun) -> tuple[str, list[JiraBug]]:
+        return job.name, search_bugs(job.name, config)
+
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = [pool.submit(_search, job) for job in failing_jobs]
+        for future in as_completed(futures):
+            name, bugs = future.result()
+            if bugs:
+                logger.info(f"  Found {len(bugs)} JIRA bugs for {name}")
+                results[name] = bugs
 
     return results
 
@@ -130,18 +133,19 @@ def create_bug_url(
 
 def suggest_bug(
     job: JobRun,
-    version: str,
+    versions: list[str],
     config: Config,
 ) -> SuggestedBug:
     """Generate a suggested JIRA bug for an unmatched failing job."""
     failing_test_names = [t.name for t in job.failing_tests[:5]]
 
-    title = f"[{job.topology}] {job.name} failing in {version} nightly"
+    versions_str = ", ".join(versions)
+    title = f"[{job.topology}] {job.name} failing in {versions_str} nightly"
 
     description_lines = [
         f"*Job*: [{job.name}|{job.prow_url}]",
         f"*Topology*: {job.topology}",
-        f"*Version*: {version}",
+        f"*Versions*: {versions_str}",
         f"*Job Type*: {job.job_type.value}",
         "",
         "*Failing Tests*:",
@@ -163,7 +167,7 @@ def suggest_bug(
         description=description,
         job_name=job.name,
         topology=job.topology or "",
-        version=version,
+        versions=versions,
         failing_tests=failing_test_names,
         create_url=create_bug_url(title, description, config),
     )

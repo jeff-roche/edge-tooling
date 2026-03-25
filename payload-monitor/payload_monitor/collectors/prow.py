@@ -4,9 +4,10 @@ import logging
 import re
 import subprocess
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
 
-from ..models import FailingTest, JobRun
+from ..models import FailingTest, JobResult, JobRun
 
 logger = logging.getLogger(__name__)
 
@@ -126,11 +127,13 @@ def enrich_job(job: JobRun) -> None:
         )
 
 
-def enrich_failing_jobs(jobs: list[JobRun]) -> None:
+def enrich_failing_jobs(jobs: list[JobRun], max_workers: int = 4) -> None:
     """Enrich all failing edge jobs with test failure details."""
-    from ..models import JobResult
-
     failing = [j for j in jobs if j.result == JobResult.FAILURE and j.topology]
+    if not failing:
+        return
     logger.info(f"Enriching {len(failing)} failing edge jobs with Prow data")
-    for job in failing:
-        enrich_job(job)
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {pool.submit(enrich_job, job): job for job in failing}
+        for future in as_completed(futures):
+            future.result()

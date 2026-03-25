@@ -12,7 +12,7 @@ from .models import (
     SuggestedBug,
 )
 from .collectors import jira as jira_collector
-from .collectors.jira import _has_auth as _jira_has_auth
+from .collectors.jira import has_auth as jira_has_auth
 
 logger = logging.getLogger(__name__)
 
@@ -30,20 +30,26 @@ def _find_recurring_failures(streams: list[StreamReport]) -> dict[str, int]:
 def _find_unmatched_jobs(
     streams: list[StreamReport],
     matched_jobs: set[str],
-) -> list[tuple[JobRun, str]]:
-    """Find failing edge jobs without JIRA matches.
+) -> list[tuple[JobRun, list[str]]]:
+    """Find failing edge jobs without JIRA matches, grouped by job name.
 
-    Returns list of (job, version) tuples.
+    Returns list of (job, versions) tuples where versions contains all
+    affected versions. This avoids suggesting duplicate bugs when the
+    same job fails across multiple versions.
     """
-    unmatched = []
-    seen = set()
+    # Group by job name, collecting all affected versions
+    by_name: dict[str, tuple[JobRun, list[str]]] = {}
     for stream in streams:
         for payload in stream.payloads:
             for job in payload.failing_edge_jobs:
-                if job.name not in matched_jobs and job.name not in seen:
-                    seen.add(job.name)
-                    unmatched.append((job, stream.version))
-    return unmatched
+                if job.name in matched_jobs:
+                    continue
+                if job.name not in by_name:
+                    by_name[job.name] = (job, [])
+                versions = by_name[job.name][1]
+                if stream.version not in versions:
+                    versions.append(stream.version)
+    return list(by_name.values())
 
 
 def analyze(
@@ -54,7 +60,7 @@ def analyze(
 
     Mutates the report in place.
     """
-    report.skip_jira = not _jira_has_auth()
+    report.skip_jira = not jira_has_auth()
     # Find all unique failing edge jobs across all streams
     all_failing: list[JobRun] = []
     for stream in report.streams:
@@ -93,8 +99,8 @@ def analyze(
     matched_job_names = set(jira_matches.keys())
     unmatched = _find_unmatched_jobs(report.streams, matched_job_names)
 
-    for job, version in unmatched:
-        suggested = jira_collector.suggest_bug(job, version, config)
+    for job, versions in unmatched:
+        suggested = jira_collector.suggest_bug(job, versions, config)
         report.suggested_bugs.append(suggested)
 
     logger.info(

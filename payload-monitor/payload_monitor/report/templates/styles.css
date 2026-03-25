@@ -88,7 +88,7 @@ a:hover { text-decoration: underline; }
   padding: 16px;
 }
 .summary-card .version { font-size: 20px; font-weight: 600; }
-.summary-card .status { font-size: 13px; margin-top: 4px; }
+.summary-card .status { font-size: 16px; font-weight: 700; margin-top: 4px; }
 .summary-card .status.healthy { color: var(--green); }
 .summary-card .status.degraded { color: var(--yellow); }
 .summary-card .status.failing { color: var(--red); }
@@ -183,9 +183,22 @@ table {
   font-size: 13px;
 }
 th {
-  resize: horizontal;
-  overflow: auto;
+  position: relative;
   min-width: 60px;
+}
+th .col-resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  z-index: 1;
+}
+th .col-resizer:hover,
+th .col-resizer.resizing {
+  background: var(--accent);
 }
 th {
   text-align: left;
@@ -201,6 +214,12 @@ td {
   padding: 8px 12px;
   border-bottom: 1px solid var(--border);
   vertical-align: top;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+table.layout-frozen td {
+  max-width: 0;
 }
 tr:hover { background: var(--surface-hover); }
 

@@ -1,7 +1,7 @@
 ---
 name: edge-payload-monitor
 description: Monitor OpenShift nightly payloads for edge topology (SNO/TNA/TNF) failures with AI-enriched analysis
-argument-hint: [--versions 4.18,4.19,4.20,4.21,4.22,4.23] [--skip-prow] [--skip-sippy]
+argument-hint: [--versions 4.18,4.19,4.20,4.21,4.22,4.23,5.0] [--skip-prow] [--skip-sippy]
 user-invocable: true
 ---
 
@@ -71,14 +71,18 @@ cd payload-monitor && python -m payload_monitor --output reports/report-$(date +
 
 Pass through any relevant flags (`--versions`, `--skip-prow`, `--skip-sippy`).
 
-The tool always outputs:
+**Important:** If a report with the same filename already exists, the tool automatically appends a timestamp (e.g., `report-2026-03-25-143027.html`). Capture the actual output path from the tool's log line:
+- `Report: /path/to/report-{name}.html`
+
+Use this actual path (not the hardcoded date-based name) in all subsequent steps.
+
+The tool outputs:
 - An HTML report (self-contained interactive dashboard)
-- A JSON data file (same path with `.json` extension)
-- A blocking summary file (`.blocking.json`) — a small file listing only failing blocking jobs with their prow URLs, topology, version, and payload tag
+- A blocking summary file (`.blocking.json`) — a small file listing only failing blocking edge jobs with their prow URLs, topology, version, and payload tag
 
 ### Step 3: Read Blocking Summary and Analyze Failures
 
-Read the small `reports/report-{date}.blocking.json` file (**not** the full JSON — this saves tokens). It contains only the failing blocking edge jobs:
+Read the small `.blocking.json` file matching the actual report path from Step 2 (**not** the full JSON — this saves tokens). It contains only the failing blocking edge jobs:
 
 ```json
 [
@@ -164,11 +168,10 @@ For JIRA context: use `ci:fetch-jira-issue` for any linked bugs, `ci:check-if-ji
 
 ### Step 4: Write Analysis File
 
-Collect the deep analysis results (from subagents or inline analysis) and write a small analysis-only JSON file keyed by `prow_url` to `reports/analysis-{date}.json`:
+Collect the deep analysis results (from subagents or inline analysis) and write a small analysis-only JSON file keyed by `prow_url`. Use the actual report stem from Step 2 (e.g., `reports/analysis-2026-03-25.json` or `reports/analysis-2026-03-25-143027.json`):
 
 ```json
 {
-  "ai_cost": "$X.XX (N input + M output tokens)",
   "by_prow_url": {
     "https://prow.ci.openshift.org/view/gs/.../123": {
       "root_cause": "One-sentence explanation of the root cause",
@@ -183,26 +186,19 @@ Collect the deep analysis results (from subagents or inline analysis) and write 
 
 This file is intentionally small — it contains only the AI analysis results, not the full report data. This minimizes token usage.
 
-### Step 5: Regenerate HTML with Deep Analysis
+### Step 5: Patch Analysis into HTML
 
-Re-run the Python tool to merge the analysis and regenerate the HTML report:
-
-```bash
-cd payload-monitor && python -m payload_monitor \
-  --from-json reports/report-$(date +%Y-%m-%d).json \
-  --merge-analysis reports/analysis-$(date +%Y-%m-%d).json \
-  --output reports/report-$(date +%Y-%m-%d).html
-```
-
-The `--merge-analysis` flag merges the small analysis file into the report by matching prow URLs, then regenerates the HTML with "AI Root Cause Analysis" cards for each analyzed job.
-
-If there were no blocking failures (no analysis file), skip `--merge-analysis`:
+Patch the analysis directly into the existing HTML report. Use the actual report path from Step 2:
 
 ```bash
 cd payload-monitor && python -m payload_monitor \
-  --from-json reports/report-$(date +%Y-%m-%d).json \
-  --output reports/report-$(date +%Y-%m-%d).html
+  --merge-analysis reports/<actual-analysis>.json \
+  --output reports/<actual-report>.html
 ```
+
+This finds each job's detail section by its prow URL and injects the "AI Root Cause Analysis" card directly into the HTML. No JSON round-trip needed.
+
+If there were no blocking failures (no analysis file), skip this step entirely — the HTML report is already complete.
 
 ### Step 6: Present Output
 
@@ -212,7 +208,6 @@ Do NOT duplicate the report data or findings summary — the HTML dashboard alre
 ## Edge Payload Monitor Report Generated
 
 Report: `payload-monitor/reports/report-{date}.html`
-JSON:   `payload-monitor/reports/report-{date}.json`
 
 Analyzed {N} blocking job failure(s) with AI root cause analysis.
 Open the HTML report for the full interactive dashboard with findings summary, suggested actions, and detailed analysis.
@@ -231,7 +226,7 @@ Offer follow-up actions the user can take from this session:
 
 - The Python tool must be run from the `payload-monitor/` directory
 - Dependencies: `pip install -r requirements.txt` (requests, jinja2, pyyaml, click)
-- JIRA features require `JIRA_TOKEN` and `JIRA_USER` environment variables (get a token from [JIRA API Tokens](https://id.atlassian.com/manage-profile/security/api-tokens))
+- JIRA features require a `JIRA_TOKEN` environment variable (get a token from [JIRA API Tokens](https://id.atlassian.com/manage-profile/security/api-tokens))
 - Prow artifact fetching requires `gsutil` (Google Cloud SDK)
 - Do NOT modify the Python source code — this skill is an orchestration layer on top
 - Do NOT duplicate report data in your output — the HTML dashboard is the primary output, keep your response brief

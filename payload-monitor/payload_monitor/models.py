@@ -93,6 +93,7 @@ class Regression:
     basis_pass_rate: float
     sample_pass_rate: float
     variant: str = ""
+    version: str = ""
     topology: str = ""
     triage_url: str = ""
     jira_bug: str = ""
@@ -138,7 +139,7 @@ class SuggestedBug:
     description: str
     job_name: str
     topology: str
-    version: str
+    versions: list[str] = field(default_factory=list)
     failing_tests: list[str] = field(default_factory=list)
     create_url: str = ""
 
@@ -166,7 +167,6 @@ class MonitorReport:
     jira_bugs: list[JiraBug] = field(default_factory=list)
     suggested_bugs: list[SuggestedBug] = field(default_factory=list)
     component_regressions: list[ComponentRegression] = field(default_factory=list)
-    ai_cost: str = ""
     skip_prow: bool = False
     skip_sippy: bool = False
     skip_jira: bool = False

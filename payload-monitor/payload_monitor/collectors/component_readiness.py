@@ -6,6 +6,7 @@ from typing import Optional
 import requests
 
 from ..models import ComponentRegression
+from .http import create_session
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,8 @@ STATUS_OK = 100
 
 # Only these versions have ha-vs-single views in Sippy
 VIEW_PATTERN = "{version}-ha-vs-single"
+
+_session = create_session()
 
 
 def _view_url(version: str) -> str:
@@ -37,22 +40,13 @@ def _test_detail_url(version: str, test_id: str, links: dict) -> str:
     if api_url:
         # The API URL contains query params we need — extract them
         # and redirect to the UI page
-        from urllib.parse import urlparse, parse_qs, urlencode
+        from urllib.parse import urlparse
         parsed = urlparse(api_url)
         return f"{BASE_URL}/sippy-ng/component_readiness/test_details?{parsed.query}"
     if test_id:
         view = VIEW_PATTERN.format(version=version)
         return f"{BASE_URL}/sippy-ng/component_readiness/test_details?view={view}&testId={test_id}"
     return ""
-
-
-def _format_variants(variants: dict) -> str:
-    """Format variants dict into a readable string like 'aws / amd64 / ovn'."""
-    parts = []
-    for key in ("Platform", "Architecture", "Network"):
-        if key in variants:
-            parts.append(variants[key])
-    return " / ".join(parts) if parts else ""
 
 
 def fetch_component_regressions(version: str) -> list[ComponentRegression]:
@@ -66,7 +60,7 @@ def fetch_component_regressions(version: str) -> list[ComponentRegression]:
     logger.info(f"Fetching component readiness for {view}")
 
     try:
-        resp = requests.get(CR_API_URL, params={"view": view}, timeout=60)
+        resp = _session.get(CR_API_URL, params={"view": view}, timeout=60)
         resp.raise_for_status()
         data = resp.json()
     except requests.RequestException as e:
@@ -96,12 +90,10 @@ def fetch_component_regressions(version: str) -> list[ComponentRegression]:
 
                 sample_success = sample_stats.get("success_count", 0)
                 sample_failure = sample_stats.get("failure_count", 0)
-                sample_total = sample_success + sample_failure
                 sample_rate = sample_stats.get("success_rate", 0) * 100
 
                 base_success = base_stats.get("success_count", 0)
                 base_failure = base_stats.get("failure_count", 0)
-                base_total = base_success + base_failure
                 base_rate = base_stats.get("success_rate", 0) * 100
 
                 regressions.append(ComponentRegression(

@@ -1,11 +1,10 @@
 """Fetch test and job health data from Sippy."""
 
 import logging
-from typing import Optional
-
 import requests
 
 from ..config import Config
+from .http import create_session
 from ..models import Regression
 
 logger = logging.getLogger(__name__)
@@ -14,31 +13,19 @@ BASE_URL = "https://sippy.dptools.openshift.org"
 JOBS_URL = f"{BASE_URL}/api/jobs"
 TESTS_URL = f"{BASE_URL}/api/tests"
 
-
-def _sippy_release(version: str) -> str:
-    """Convert version string to Sippy release format (e.g., '4.19')."""
-    return version
-
-
-def _is_edge_job(name: str, config: Config) -> Optional[str]:
-    """Check if a job name matches any edge topology, return topology name."""
-    for topo in config.topologies:
-        if topo.matches(name):
-            return topo.name
-    return None
+_session = create_session()
 
 
 def fetch_edge_jobs(release: str, config: Config) -> list[dict]:
     """Fetch jobs from Sippy and filter for edge topologies."""
-    sippy_release = _sippy_release(release)
-    logger.info(f"Fetching Sippy jobs for release {sippy_release}")
+    logger.info(f"Fetching Sippy jobs for release {release}")
 
     try:
-        resp = requests.get(JOBS_URL, params={"release": sippy_release}, timeout=30)
+        resp = _session.get(JOBS_URL, params={"release": release}, timeout=30)
         resp.raise_for_status()
         all_jobs = resp.json()
     except requests.RequestException as e:
-        logger.error(f"Failed to fetch Sippy jobs for {sippy_release}: {e}")
+        logger.error(f"Failed to fetch Sippy jobs for {release}: {e}")
         return []
 
     if not isinstance(all_jobs, list):
@@ -48,26 +35,26 @@ def fetch_edge_jobs(release: str, config: Config) -> list[dict]:
     edge_jobs = []
     for job in all_jobs:
         name = job.get("name", "")
-        topology = _is_edge_job(name, config)
+        topology = config.classify_topology(name)
         if topology:
             job["_topology"] = topology
             edge_jobs.append(job)
 
-    logger.info(f"  Found {len(edge_jobs)} edge jobs for {sippy_release}")
+    logger.info(f"  Found {len(edge_jobs)} edge jobs for {release}")
     return edge_jobs
 
 
 def fetch_edge_tests(release: str, config: Config) -> list[dict]:
     """Fetch tests from Sippy — used for additional regression detection."""
-    sippy_release = _sippy_release(release)
-    logger.debug(f"Fetching Sippy tests for release {sippy_release}")
+    logger.debug(f"Fetching Sippy tests for release {release}")
 
     try:
-        resp = requests.get(TESTS_URL, params={"release": sippy_release}, timeout=60)
+        resp = _session.get(TESTS_URL, params={"release": release}, timeout=60)
         resp.raise_for_status()
-        return resp.json() if isinstance(resp.json(), list) else []
+        data = resp.json()
+        return data if isinstance(data, list) else []
     except requests.RequestException as e:
-        logger.error(f"Failed to fetch Sippy tests for {sippy_release}: {e}")
+        logger.error(f"Failed to fetch Sippy tests for {release}: {e}")
         return []
 
 

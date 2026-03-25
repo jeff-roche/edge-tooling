@@ -5,6 +5,8 @@ from pathlib import Path
 
 import yaml
 
+from typing import Optional
+
 from .models import Topology
 
 DEFAULT_CONFIG_PATH = Path(__file__).parent.parent / "config.yaml"
@@ -42,6 +44,13 @@ class Config:
     jira: JiraConfig = field(default_factory=JiraConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
     slack: SlackConfig = field(default_factory=SlackConfig)
+
+    def classify_topology(self, job_name: str) -> Optional[str]:
+        """Return the topology name if job_name matches any configured topology."""
+        for topo in self.topologies:
+            if topo.matches(job_name):
+                return topo.name
+        return None
 
 
 def load_config(path: Path | None = None) -> Config:
