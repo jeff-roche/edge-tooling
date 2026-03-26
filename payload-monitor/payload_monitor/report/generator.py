@@ -23,7 +23,6 @@ from ..models import (
     PayloadStatus,
     Regression,
     StreamReport,
-    SuggestedBug,
 )
 
 logger = logging.getLogger(__name__)
@@ -59,6 +58,9 @@ def _build_template_context(report: MonitorReport) -> dict:
                 all_failing.append(item)
                 if job.failing_tests:
                     failure_details.append(item)
+
+    # Sort blocking jobs first
+    all_failing.sort(key=lambda x: (0 if x["job"].job_type == JobType.BLOCKING else 1))
 
     # Collect all regressions
     all_regressions = []
@@ -181,25 +183,6 @@ def generate_json(report: MonitorReport, output_path: Path) -> None:
     output_path.write_text(json.dumps(data, indent=2))
     logger.info(f"JSON data written to {output_path}")
 
-
-def generate_blocking_json(report: MonitorReport, output_path: Path) -> None:
-    """Write a small JSON listing only failing blocking edge jobs."""
-    blocking = []
-    for stream in report.streams:
-        for payload in stream.payloads:
-            for j in payload.edge_jobs:
-                if j.result == JobResult.FAILURE and j.job_type == JobType.BLOCKING:
-                    blocking.append({
-                        "job_name": j.name,
-                        "prow_url": j.prow_url,
-                        "topology": j.topology,
-                        "version": stream.version,
-                        "payload_tag": payload.tag,
-                    })
-    if blocking:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(json.dumps(blocking, indent=2))
-        logger.info(f"Blocking summary written to {output_path}")
 
 
 def _render_analysis_card(da: dict) -> str:

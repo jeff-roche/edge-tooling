@@ -6,12 +6,15 @@ topologies:
   - name: SNO
     job_patterns: ["sno", "single-node", "metal-single-node"]
     exclude_patterns: ["telco"]
+    jira_component: "SNO"
   - name: TNA
     job_patterns: ["two-node", "tna"]
     exclude_patterns: ["telco"]
+    jira_component: "Two Node with Arbiter"
   - name: TNF
     job_patterns: ["tnf", "two-node-fencing"]
     exclude_patterns: ["telco"]
+    jira_component: "Two Node Fencing"
 
 payloads_per_stream: 5
 

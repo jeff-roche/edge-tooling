@@ -227,7 +227,7 @@
       <td><a href="{{ item.payload_url }}" target="_blank">{{ item.payload_tag }}</a></td>
       <td><span class="badge {{ item.job.topology | lower }}">{{ item.job.topology }}</span></td>
       <td><span class="badge {{ item.job.job_type.value }}">{{ item.job.job_type.value }}</span></td>
-      <td style="white-space:nowrap;font-size:12px;color:var(--text-muted)">{{ item.date }}</td>
+      <td style="white-space:nowrap;font-size:13px;color:var(--text-muted)">{{ item.date }}</td>
       <td><a href="#detail-{{ loop.index }}" class="detail-link">View Details ↓</a></td>
     </tr>
     {% endfor %}
@@ -285,9 +285,9 @@
         <span>{{ detail.job.deep_analysis.recommendation }}</span>
       </div>
     </div>
-    {% elif detail.job.job_type.value == 'informing' %}
+    {% else %}
     <div class="claude-suggestion">
-      For deeper analysis of this informing job, use Claude directly:<br>
+      For deeper analysis, use Claude directly:<br>
       <code>/ci:prow-job-analyze-test-failure {{ detail.job.prow_url }}</code>
     </div>
     {% endif %}
@@ -405,7 +405,7 @@
     {% for cr in component_regressions %}
     <tr class="cr-row" data-row-index="{{ loop.index }}" data-crplatform="{{ cr.variants.get('Platform', '') }}" data-crversion="{{ cr.version }}">
       <td>{{ cr.component }}</td>
-      <td>
+      <td style="font-size:13px;max-width:700px">
         {% if cr.detail_url %}
         <a href="{{ cr.detail_url }}" target="_blank">{{ cr.test_name }}</a>
         {% else %}
@@ -413,7 +413,7 @@
         {% endif %}
       </td>
       <td>{{ cr.version }}</td>
-      <td style="font-size:12px;color:var(--text-muted)">
+      <td style="font-size:13px;color:var(--text-muted)">
         {% set parts = [] %}
         {% if cr.variants.get('Platform') %}{% set _ = parts.append(cr.variants['Platform']) %}{% endif %}
         {% if cr.variants.get('Architecture') %}{% set _ = parts.append(cr.variants['Architecture']) %}{% endif %}
@@ -491,7 +491,14 @@
     </ul>
   </div>
   {% endif %}
-  <a href="{{ bug.create_url }}" target="_blank" class="create-btn">Create in JIRA</a>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+    <a href="{{ bug.create_url }}" target="_blank" class="create-btn">Create in JIRA</a>
+    <button class="create-btn" style="background:rgba(88,166,255,0.1);color:var(--accent);border:1px solid var(--accent)" onclick="var el=this.closest('.suggest-card').querySelector('.claude-cmd-popup');el.style.display=el.style.display==='none'?'block':'none'">Gather Details with Claude</button>
+  </div>
+  <div class="claude-cmd-popup" style="display:none;margin-top:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 12px">
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">Run in Claude Code to get detailed analysis for the bug description:</div>
+    <code style="font-size:12px;word-break:break-all">/ci:prow-job-analyze-test-failure {{ bug.prow_url }}</code>
+  </div>
 </div>
 {% endfor %}
 {% endif %}

@@ -52,6 +52,13 @@ class Config:
                 return topo.name
         return None
 
+    def jira_component_for(self, topology_name: str) -> str:
+        """Return the JIRA component for a topology name, or empty string."""
+        for topo in self.topologies:
+            if topo.name == topology_name:
+                return topo.jira_component
+        return ""
+
 
 def load_config(path: Path | None = None) -> Config:
     config_path = path or DEFAULT_CONFIG_PATH
@@ -67,9 +74,9 @@ def load_config(path: Path | None = None) -> Config:
 def _default_config() -> Config:
     return Config(
         topologies=[
-            Topology("SNO", ["sno", "single-node", "metal-single-node"], ["telco"]),
-            Topology("TNA", ["two-node", "tna"], ["telco"]),
-            Topology("TNF", ["tnf", "two-node-fencing"], ["telco"]),
+            Topology("SNO", ["sno", "single-node", "metal-single-node"], ["telco"], "SNO"),
+            Topology("TNA", ["two-node", "tna"], ["telco"], "Two Node with Arbiter"),
+            Topology("TNF", ["tnf", "two-node-fencing"], ["telco"], "Two Node Fencing"),
         ]
     )
 
@@ -87,6 +94,7 @@ def _parse_config(raw: dict) -> Config:
             name=t["name"],
             job_patterns=t.get("job_patterns", []),
             exclude_patterns=t.get("exclude_patterns", []),
+            jira_component=t.get("jira_component", ""),
         ))
     if not topologies:
         topologies = _default_config().topologies

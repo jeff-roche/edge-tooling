@@ -36,16 +36,12 @@ This skill composes with the following installed marketplace CI skills from the 
 | `ci:prow-job-analyze-metal-install-failure` | Analyze bare metal install failures using dev-scripts artifacts — use for metal/baremetal SNO or TNF jobs with "metal" in name |
 | `ci:prow-job-analyze-resource` | Analyze K8s resource lifecycle in Prow job artifacts (audit logs, pod logs) — use when failure involves resource state issues |
 | `ci:prow-job-artifact-search` | Search, list, and fetch artifacts from Prow job runs in GCS — use when you need to find specific artifacts |
-| `ci:prow-job-extract-must-gather` | Extract and decompress must-gather archives — use when cluster diagnostics are needed |
 | `ci:analyze-regression` | Analyze Component Readiness regression details and suggest next steps — use for Sippy-detected regressions |
 | `ci:check-if-jira-regression-is-ongoing` | Check if a JIRA regression bug is still ongoing or resolved — use to validate whether known bugs still apply |
 
 ### Action Skills
 | Skill | When to Use |
 |-------|-------------|
-| `ci:set-release-blocker` | Set Release Blocker field on a JIRA issue — use when an edge failure is blocking payload acceptance |
-| `ci:triage-regression` | Create or update a Component Readiness triage record — use when a Sippy regression needs to be triaged |
-| `ci:revert-pr` | Revert a merged PR breaking CI/payloads — use when a specific PR is identified as the root cause |
 | `ci:trigger-payload-job` | Trigger payload testing on a PR — use to verify a fix resolves the payload failure |
 
 ---
@@ -61,7 +57,17 @@ Parse `$ARGUMENTS` to determine options:
 - **`--skip-sippy`**: Skip Sippy regression check
 - If `$ARGUMENTS` is empty: use defaults (all configured versions)
 
-### Step 2: Run the Python Tool
+### Step 2: Install Prerequisites (if needed)
+
+Before running the tool, check if dependencies are already installed:
+
+```bash
+cd payload-monitor && python -c "import requests, jinja2, yaml, click" 2>/dev/null || pip install -r requirements.txt
+```
+
+This avoids re-running `pip install` on every invocation when dependencies are already satisfied.
+
+### Step 3: Run the Python Tool
 
 Run the payload monitor Python tool to collect data and generate the base report:
 
@@ -78,33 +84,23 @@ Use this actual path (not the hardcoded date-based name) in all subsequent steps
 
 The tool outputs:
 - An HTML report (self-contained interactive dashboard)
-- A blocking summary file (`.blocking.json`) — a small file listing only failing blocking edge jobs with their prow URLs, topology, version, and payload tag
+- Blocking job summary printed to stdout (pipe-delimited lines between `BLOCKING_JOBS_START` and `BLOCKING_JOBS_END` markers)
 
-### Step 3: Read Blocking Summary and Analyze Failures
+### Step 4: Parse Blocking Jobs from Output and Analyze Failures
 
-Read the small `.blocking.json` file matching the actual report path from Step 2 (**not** the full JSON — this saves tokens). It contains only the failing blocking edge jobs:
+Parse the blocking job lines from the tool's stdout. Each line between the markers has the format:
 
-```json
-[
-  {
-    "job_name": "periodic-ci-...-sno-...",
-    "prow_url": "https://prow.ci.openshift.org/view/gs/.../123",
-    "topology": "SNO",
-    "version": "4.19",
-    "payload_tag": "4.19.0-0.nightly-2026-03-25-085944"
-  }
-]
+```
+BLOCKING|job_name|prow_url|topology|version|payload_tag
 ```
 
-If the file does not exist or is empty, skip to Step 5 (no blocking failures to analyze).
+If no `BLOCKING_JOBS_START` marker appears in the output, there are no blocking failures — skip to Step 6.
 
 **For informing job failures:** Do NOT run deep analysis. The HTML report already includes a suggestion to use Claude directly with `/ci:prow-job-analyze-test-failure <prow-url>`.
 
-#### Multi-Agent Orchestration (2+ blocking failures)
+#### Analysis Prompt
 
-When there are **2 or more** blocking failures, use the Agent tool to analyze them **in parallel** — one subagent per blocking job. This significantly reduces wall-clock time.
-
-For each blocking job, spawn a subagent with this prompt:
+Use the following prompt for each blocking job. When there is **exactly 1 blocking failure**, run it directly in the main agent (no subagent). When there are **2 or more blocking failures**, spawn one subagent per job using the Agent tool, all in parallel — this significantly reduces wall-clock time.
 
 ```
 Analyze this failing blocking edge job and return a JSON deep_analysis object.
@@ -141,34 +137,11 @@ Return ONLY a JSON object with these fields:
 }
 ```
 
-Launch all subagents in parallel using multiple Agent tool calls in the same response. Collect their results and proceed to Step 4.
+When using subagents, launch all in parallel using multiple Agent tool calls in the same response. Collect their results and proceed to Step 5.
 
-#### Single-Agent Analysis (1 blocking failure)
+### Step 5: Write Analysis File
 
-When there is exactly **1 blocking failure**, analyze it directly in the main agent (no subagent). The overhead of spawning a subagent provides no benefit for a single job — it adds latency from context setup without any parallelism gain.
-
-Run the same analysis steps inline:
-
-1. Use `ci:fetch-job-run-summary` to get all failed tests grouped by SIG
-2. Use `ci:fetch-prowjob-json` to get job metadata
-
-Then branch based on failure type:
-
-- **Install failure** (error contains "install should succeed", "bootstrap", or job failed in pre/setup phase):
-  Use `ci:prow-job-analyze-install-failure` for standard install failures.
-  Use `ci:prow-job-analyze-metal-install-failure` if the job name contains "metal" (common for SNO/TNF baremetal jobs).
-- **Test failure** (job passed install but failed during test phase):
-  Use `ci:prow-job-analyze-test-failure` to inspect test code, download artifacts, and identify root cause.
-- **Resource/state failure** (etcd issues, operator degraded, node not ready — common in two-node topologies):
-  Use `ci:prow-job-analyze-resource` to trace K8s resource lifecycle via audit logs.
-  Use `ci:prow-job-extract-must-gather` if must-gather archives are available.
-
-For payload-level context: use `ci:fetch-new-prs-in-payload` to identify suspect PRs.
-For JIRA context: use `ci:fetch-jira-issue` for any linked bugs, `ci:check-if-jira-regression-is-ongoing` for known regressions.
-
-### Step 4: Write Analysis File
-
-Collect the deep analysis results (from subagents or inline analysis) and write a small analysis-only JSON file keyed by `prow_url`. Use the actual report stem from Step 2 (e.g., `reports/analysis-2026-03-25.json` or `reports/analysis-2026-03-25-143027.json`):
+Collect the deep analysis results (from subagents or inline analysis) and write a small analysis-only JSON file keyed by `prow_url`. Use the actual report stem from Step 3 (e.g., `reports/analysis-2026-03-25.json` or `reports/analysis-2026-03-25-143027.json`):
 
 ```json
 {
@@ -186,9 +159,9 @@ Collect the deep analysis results (from subagents or inline analysis) and write 
 
 This file is intentionally small — it contains only the AI analysis results, not the full report data. This minimizes token usage.
 
-### Step 5: Patch Analysis into HTML
+### Step 6: Patch Analysis into HTML
 
-Patch the analysis directly into the existing HTML report. Use the actual report path from Step 2:
+Patch the analysis directly into the existing HTML report. Use the actual report path from Step 3:
 
 ```bash
 cd payload-monitor && python -m payload_monitor \
@@ -200,7 +173,7 @@ This finds each job's detail section by its prow URL and injects the "AI Root Ca
 
 If there were no blocking failures (no analysis file), skip this step entirely — the HTML report is already complete.
 
-### Step 6: Present Output
+### Step 7: Present Output
 
 Do NOT duplicate the report data or findings summary — the HTML dashboard already contains all of that. Present only a brief confirmation:
 
@@ -225,8 +198,8 @@ Offer follow-up actions the user can take from this session:
 ## Important Notes
 
 - The Python tool must be run from the `payload-monitor/` directory
-- Dependencies: `pip install -r requirements.txt` (requests, jinja2, pyyaml, click)
-- JIRA features require a `JIRA_TOKEN` environment variable (get a token from [JIRA API Tokens](https://id.atlassian.com/manage-profile/security/api-tokens))
+- Dependencies are checked and installed automatically in Step 2
+- JIRA features require a `JIRA_TOKEN` environment variable with **read-only** permissions — the tool only searches for existing bugs, never creates or modifies issues
 - Prow artifact fetching requires `gsutil` (Google Cloud SDK)
 - Do NOT modify the Python source code — this skill is an orchestration layer on top
 - Do NOT duplicate report data in your output — the HTML dashboard is the primary output, keep your response brief

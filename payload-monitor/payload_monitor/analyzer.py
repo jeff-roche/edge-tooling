@@ -100,7 +100,8 @@ def analyze(
     unmatched = _find_unmatched_jobs(report.streams, matched_job_names)
 
     for job, versions in unmatched:
-        suggested = jira_collector.suggest_bug(job, versions, config)
+        component = config.jira_component_for(job.topology) if job.topology else ""
+        suggested = jira_collector.suggest_bug(job, versions, config, component=component)
         report.suggested_bugs.append(suggested)
 
     logger.info(

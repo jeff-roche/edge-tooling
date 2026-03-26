@@ -89,18 +89,20 @@ topologies:
   - name: SNO
     job_patterns: ["sno", "single-node", "metal-single-node"]
     exclude_patterns: ["telco"]
+    jira_component: "SNO"
   - name: TNA
     job_patterns: ["two-node", "tna"]
     exclude_patterns: ["telco"]
+    jira_component: "Two Node with Arbiter"
   - name: TNF
     job_patterns: ["tnf", "two-node-fencing"]
     exclude_patterns: ["telco"]
+    jira_component: "Two Node Fencing"
 
 payloads_per_stream: 5      # recent payloads to analyze per stream
 
 jira:
   project: "OCPBUGS"
-  component: "Edge Enablement"
 
 output:
   report_dir: "./reports"
@@ -115,14 +117,20 @@ slack:                       # future feature
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `JIRA_TOKEN` | For JIRA features | Personal access token for issues.redhat.com |
+| `JIRA_TOKEN` | For JIRA features | Atlassian Cloud API token or PAT (read-only) |
+| `JIRA_EMAIL` | Optional | Email for Basic auth (if not using PAT) |
 
-To obtain a JIRA token, go to your [JIRA Personal Access Tokens](https://id.atlassian.com/manage-profile/security/api-tokens) page and create a new token.
+To obtain a token, go to [Atlassian API Tokens](https://id.atlassian.com/manage-profile/security/api-tokens) and create a new token. **Use read-only permissions** — this tool only searches for existing bugs and never creates or modifies JIRA issues. The "Create in JIRA" links open the browser for manual review before submission.
 
 Set it in your shell before running:
 
 ```bash
-export JIRA_TOKEN="your-token-here"
+# Option 1: API token with email (Basic auth)
+export JIRA_EMAIL="your-email"
+export JIRA_TOKEN="your-api-token"
+
+# Option 2: Personal Access Token (Bearer auth)
+export JIRA_TOKEN="your-pat-here"
 ```
 
 Or add it to `~/.bashrc` / `~/.zshrc` for persistence.
@@ -154,7 +162,7 @@ Options:
 | [Sippy](https://sippy.dptools.openshift.org) | `/api/releases`, `/api/jobs` | None | Version auto-discovery, job pass rates, regressions |
 | [Sippy Component Readiness](https://sippy.dptools.openshift.org/sippy-ng/component_readiness/main) | `/api/component_readiness` | None | HA vs Single Node topology regression detection |
 | [Prow](https://prow.ci.openshift.org) | Job API + GCS artifacts | None | Job logs, junit XMLs, failing test details |
-| [JIRA](https://issues.redhat.com) | REST API v2 | Token | Existing bug search, bug creation links |
+| [JIRA](https://redhat.atlassian.net) | REST API v3 | Token (read-only) | Existing bug search, bug creation links |
 
 ## Topology Job Patterns
 

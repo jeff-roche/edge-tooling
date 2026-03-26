@@ -1,5 +1,6 @@
 """Search JIRA for existing bugs related to edge topology failures."""
 
+import base64
 import logging
 import os
 import urllib.parse
@@ -14,17 +15,26 @@ from ..models import JiraBug, JobRun, SuggestedBug
 
 logger = logging.getLogger(__name__)
 
-JIRA_BASE = "https://issues.redhat.com"
-SEARCH_URL = f"{JIRA_BASE}/rest/api/2/search"
+JIRA_BASE = "https://redhat.atlassian.net"
+SEARCH_URL = f"{JIRA_BASE}/rest/api/3/search"
 
 _session = create_session()
 
 
 def _get_headers() -> dict:
-    """Get request headers with auth if available."""
-    headers = {"Content-Type": "application/json"}
+    """Get request headers with auth if available.
+
+    Supports two auth modes:
+    - JIRA_TOKEN alone: Bearer token (Atlassian Cloud PAT)
+    - JIRA_EMAIL + JIRA_TOKEN: Basic auth (email + API token)
+    """
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
     token = os.environ.get("JIRA_TOKEN")
-    if token:
+    email = os.environ.get("JIRA_EMAIL")
+    if email and token:
+        creds = base64.b64encode(f"{email}:{token}".encode()).decode()
+        headers["Authorization"] = f"Basic {creds}"
+    elif token:
         headers["Authorization"] = f"Bearer {token}"
     return headers
 
@@ -36,6 +46,7 @@ def has_auth() -> bool:
 def search_bugs(
     job_name: str,
     config: Config,
+    topology: Optional[str] = None,
     max_results: int = 5,
 ) -> list[JiraBug]:
     """Search JIRA for bugs matching a failing job name."""
@@ -46,8 +57,11 @@ def search_bugs(
     # Search by job name in summary or description
     # Escape special JQL characters
     escaped = job_name.replace('"', '\\"')
+    component = config.jira_component_for(topology) if topology else ""
+    component_clause = f'AND component = "{component}" ' if component else ""
     jql = (
         f'project = {config.jira.project} '
+        f'{component_clause}'
         f'AND (summary ~ "{escaped}" OR description ~ "{escaped}") '
         f'AND status not in (Closed, "Release Pending") '
         f'ORDER BY updated DESC'
@@ -103,7 +117,7 @@ def search_bugs_for_jobs(
     results = {}
 
     def _search(job: JobRun) -> tuple[str, list[JiraBug]]:
-        return job.name, search_bugs(job.name, config)
+        return job.name, search_bugs(job.name, config, topology=job.topology)
 
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = [pool.submit(_search, job) for job in failing_jobs]
@@ -120,14 +134,17 @@ def create_bug_url(
     title: str,
     description: str,
     config: Config,
+    component: str = "",
 ) -> str:
     """Generate a JIRA create-issue URL with pre-populated fields."""
     params = {
         "project.key": config.jira.project,
-        "issuetype": "Bug",
+        "issuetype.name": "Bug",
         "summary": title,
         "description": description,
     }
+    if component:
+        params["component"] = component
     return f"{JIRA_BASE}/secure/CreateIssue!default.jspa?{urllib.parse.urlencode(params)}"
 
 
@@ -135,6 +152,7 @@ def suggest_bug(
     job: JobRun,
     versions: list[str],
     config: Config,
+    component: str = "",
 ) -> SuggestedBug:
     """Generate a suggested JIRA bug for an unmatched failing job."""
     failing_test_names = [t.name for t in job.failing_tests[:5]]
@@ -169,5 +187,6 @@ def suggest_bug(
         topology=job.topology or "",
         versions=versions,
         failing_tests=failing_test_names,
-        create_url=create_bug_url(title, description, config),
+        create_url=create_bug_url(title, description, config, component=component),
+        prow_url=job.prow_url,
     )

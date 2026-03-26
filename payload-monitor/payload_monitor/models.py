@@ -28,6 +28,7 @@ class Topology:
     name: str
     job_patterns: list[str]
     exclude_patterns: list[str] = field(default_factory=list)
+    jira_component: str = ""
 
     def matches(self, job_name: str) -> bool:
         job_lower = job_name.lower()
@@ -142,6 +143,7 @@ class SuggestedBug:
     versions: list[str] = field(default_factory=list)
     failing_tests: list[str] = field(default_factory=list)
     create_url: str = ""
+    prow_url: str = ""
 
 
 @dataclass

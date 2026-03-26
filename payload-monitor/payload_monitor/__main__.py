@@ -14,13 +14,13 @@ from .collectors.release_controller import collect as collect_payloads, discover
 from .config import load_config
 from .models import MonitorReport
 from .report.generator import (
-    generate_blocking_json,
     generate_html,
     generate_json,
     load_json,
     merge_analysis,
     patch_analysis_html,
 )
+from .models import JobResult, JobType
 
 
 def _setup_logging(verbose: bool) -> None:
@@ -160,10 +160,6 @@ def main(
     # Generate HTML report
     generate_html(report, html_path)
 
-    # Generate blocking summary for AI analysis workflow
-    blocking_path = html_path.with_suffix(".blocking.json")
-    generate_blocking_json(report, blocking_path)
-
     # Optionally export full JSON
     if export_json:
         json_path = html_path.with_suffix(".json")
@@ -175,6 +171,21 @@ def main(
     total_regressions = sum(len(s.regressions) for s in report.streams)
     logger.info(f"Done. {total_edge_failures} edge failures, {total_regressions} regressions")
     logger.info(f"Report: {html_path.resolve()}")
+
+    # Print blocking job summary to stdout for skill consumption
+    blocking = []
+    for stream in report.streams:
+        for payload in stream.payloads:
+            for j in payload.edge_jobs:
+                if j.result == JobResult.FAILURE and j.job_type == JobType.BLOCKING:
+                    blocking.append(
+                        f"BLOCKING|{j.name}|{j.prow_url}|{j.topology or ''}|{stream.version}|{payload.tag}"
+                    )
+    if blocking:
+        print("BLOCKING_JOBS_START")
+        for line in blocking:
+            print(line)
+        print("BLOCKING_JOBS_END")
 
     if open_browser:
         webbrowser.open(f"file://{html_path.resolve()}")
