@@ -11,7 +11,7 @@ import click
 from .analyzer import analyze
 from .collectors import component_readiness, prow, sippy
 from .collectors.release_controller import collect as collect_payloads, discover_streams
-from .config import load_config
+from .config import Config
 from .models import MonitorReport
 from .report.generator import (
     generate_html,
@@ -33,8 +33,6 @@ def _setup_logging(verbose: bool) -> None:
 
 
 @click.command()
-@click.option("--config", "config_path", type=click.Path(exists=True), default=None,
-              help="Config file path (default: config.yaml)")
 @click.option("--versions", type=str, default=None,
               help="Override versions, comma-separated (e.g., '4.18,4.19')")
 @click.option("--output", "output_path", type=click.Path(), default=None,
@@ -54,19 +52,19 @@ def _setup_logging(verbose: bool) -> None:
 @click.option("--merge-analysis", "merge_analysis_path", type=click.Path(exists=True), default=None,
               help="Merge analysis JSON into an existing HTML report (or into --from-json data)")
 def main(
-    config_path, versions, output_path, from_json, export_json,
+    versions, output_path, from_json, export_json,
     open_browser, verbose, skip_prow, skip_sippy, merge_analysis_path,
 ):
     """Edge Payload Monitor — monitor OpenShift nightly payloads for edge topology failures."""
     _setup_logging(verbose)
     logger = logging.getLogger("payload_monitor")
 
-    # Load config
-    config = load_config(Path(config_path) if config_path else None)
+    # Build config
+    config = Config()
 
     # Determine output path
     if not output_path:
-        report_dir = Path(config.output.report_dir)
+        report_dir = Path(config.report_dir)
         date_str = datetime.now().strftime("%Y-%m-%d")
         output_path = str(report_dir / f"report-{date_str}.html")
     html_path = Path(output_path)
@@ -102,8 +100,7 @@ def main(
 
     # Override versions if specified
     if versions:
-        config.versions.auto_discover = False
-        config.versions.override = [v.strip() for v in versions.split(",")]
+        config.versions = [v.strip() for v in versions.split(",")]
 
     logger.info("Starting Edge Payload Monitor")
 

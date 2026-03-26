@@ -22,16 +22,7 @@ logger = logging.getLogger(__name__)
 BASE_URL = "https://amd64.ocp.releases.ci.openshift.org"
 TAGS_URL = f"{BASE_URL}/api/v1/releasestream/{{stream}}/tags"
 RELEASE_URL = f"{BASE_URL}/api/v1/releasestream/{{stream}}/release/{{tag}}"
-SIPPY_RELEASES_URL = "https://sippy.dptools.openshift.org/api/releases"
-STREAMS_URL = f"{BASE_URL}/api/v1/releasestreams/accepted"
-
-# Fallback versions if auto-discovery fails
-FALLBACK_VERSIONS = ["4.18", "4.19", "4.20", "4.21", "4.22", "4.23", "5.0"]
-
 _session = create_session()
-
-# Only monitor versions >= this threshold
-MIN_VERSION = (4, 18)
 
 
 def _stream_name(version: str) -> str:
@@ -75,87 +66,10 @@ def _parse_jobs(
     return runs
 
 
-def _parse_version_tuple(version: str) -> tuple[int, ...]:
-    """Parse '4.18' into (4, 18) for comparison."""
-    try:
-        return tuple(int(p) for p in version.split("."))
-    except ValueError:
-        return (0,)
-
-
-def _discover_from_sippy() -> list[str]:
-    """Discover versions from the Sippy releases API."""
-    try:
-        resp = _session.get(SIPPY_RELEASES_URL, timeout=15)
-        resp.raise_for_status()
-        data = resp.json()
-        releases = data.get("releases", [])
-    except requests.RequestException as e:
-        logger.warning(f"Sippy discovery failed: {e}")
-        return []
-
-    versions = []
-    for r in releases:
-        if "-" in r or not r[0].isdigit():
-            continue
-        if _parse_version_tuple(r) >= MIN_VERSION:
-            versions.append(r)
-    return versions
-
-
-def _discover_from_release_controller() -> list[str]:
-    """Discover versions from the release controller's nightly streams."""
-    try:
-        resp = _session.get(STREAMS_URL, timeout=15)
-        resp.raise_for_status()
-        data = resp.json()
-    except requests.RequestException as e:
-        logger.warning(f"Release controller discovery failed: {e}")
-        return []
-
-    versions = []
-    for stream_name in data.keys():
-        if not stream_name.endswith(".0-0.nightly"):
-            continue
-        version = stream_name.replace(".0-0.nightly", "")
-        if _parse_version_tuple(version) >= MIN_VERSION:
-            versions.append(version)
-    return versions
-
-
-def _auto_discover_versions() -> list[str]:
-    """Auto-discover active OCP versions from Sippy and the release controller.
-
-    Queries both sources and merges results to ensure all active nightly
-    streams are found (Sippy may lag behind the release controller for
-    newer versions like 4.23 and 5.0).
-    """
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        sippy_future = pool.submit(_discover_from_sippy)
-        rc_future = pool.submit(_discover_from_release_controller)
-        sippy_versions = sippy_future.result()
-        rc_versions = rc_future.result()
-
-    # Merge and deduplicate
-    all_versions = list(set(sippy_versions + rc_versions))
-
-    if not all_versions:
-        logger.warning("No versions found via auto-discovery, using fallback")
-        return FALLBACK_VERSIONS
-
-    all_versions.sort(key=_parse_version_tuple)
-    logger.info(f"Auto-discovered versions: {all_versions}")
-    return all_versions
-
 
 def discover_streams(config: Config) -> list[str]:
     """Return list of nightly stream names to monitor."""
-    if config.versions.override:
-        return [_stream_name(v) for v in config.versions.override]
-    if config.versions.auto_discover:
-        versions = _auto_discover_versions()
-        return [_stream_name(v) for v in versions]
-    return [_stream_name(v) for v in FALLBACK_VERSIONS]
+    return [_stream_name(v) for v in config.versions]
 
 
 def fetch_tags(stream: str, limit: int = 5) -> list[dict]:

@@ -114,7 +114,7 @@ def generate_html(report: MonitorReport, output_path: Path | None = None) -> str
     """
     env = Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
-        autoescape=False,
+        autoescape=True,
     )
 
     # Load CSS and JS to inline

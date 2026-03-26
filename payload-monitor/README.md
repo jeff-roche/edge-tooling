@@ -8,7 +8,7 @@ Automated monitoring tool for OpenShift nightly payload health across edge topol
 # Install dependencies
 pip install -r requirements.txt
 
-# Run with defaults (auto-discovers active OCP streams)
+# Run with defaults (monitors versions 4.18 through 5.0)
 python -m payload_monitor
 
 # Run and open report in browser
@@ -29,7 +29,7 @@ Or use the convenience wrapper:
 
 ## What It Does
 
-1. **Fetches nightly payloads** from the [amd64 release controller](https://amd64.ocp.releases.ci.openshift.org) for active OCP nightly streams (auto-discovered from both Sippy and the release controller, currently 4.18 through 5.0)
+1. **Fetches nightly payloads** from the [amd64 release controller](https://amd64.ocp.releases.ci.openshift.org) for OCP nightly streams (4.18 through 5.0 by default, overridable with `--versions`)
 2. **Filters for edge topology jobs** (SNO, TNA, TNF) in blocking and informing job results
 3. **Analyzes failures** by fetching Prow job logs and extracting failing test names and error signatures
 4. **Queries Sippy** for job-level regressions (pass rate drops) across edge topologies
@@ -73,45 +73,19 @@ Or use the convenience wrapper:
 - **Parallel data collection**: Release Controller, Sippy, and Component Readiness APIs are queried concurrently. Per-stream payload fetches are also parallelized.
 - **Shared HTTP sessions**: All collectors reuse persistent connections with automatic retry and exponential backoff for transient failures.
 - **No JSON round-trip**: AI analysis is patched directly into the existing HTML report instead of serializing/deserializing the full report data through JSON.
-- **Minimal AI input**: Only a small `blocking.json` (job names and prow URLs) is read by Claude — never the full report data. Deep analysis runs only on blocking job failures; informing jobs get a lightweight Claude suggestion instead.
+- **Minimal AI input**: Blocking job data is emitted to stdout via structured markers (`BLOCKING_JOBS_START`/`BLOCKING_JOBS_END`) — Claude reads only job names and Prow URLs, never the full report data. Deep analysis runs only on blocking job failures; informing jobs get a lightweight Claude suggestion instead.
 - **Multi-agent parallelism**: When multiple blocking jobs need analysis, each is analyzed by a separate subagent in parallel.
 
 ## Configuration
 
-Edit `config.yaml` to customize behavior:
+Configuration is hardcoded in `payload_monitor/config.py`. The defaults are:
 
-```yaml
-versions:
-  auto_discover: true       # auto-discover active nightly streams
-  override: []              # or specify: ["4.18", "4.19", "4.20", "4.21", "4.22", "4.23", "5.0"]
-
-topologies:
-  - name: SNO
-    job_patterns: ["sno", "single-node", "metal-single-node"]
-    exclude_patterns: ["telco"]
-    jira_component: "SNO"
-  - name: TNA
-    job_patterns: ["two-node", "tna"]
-    exclude_patterns: ["telco"]
-    jira_component: "Two Node with Arbiter"
-  - name: TNF
-    job_patterns: ["tnf", "two-node-fencing"]
-    exclude_patterns: ["telco"]
-    jira_component: "Two Node Fencing"
-
-payloads_per_stream: 5      # recent payloads to analyze per stream
-
-jira:
-  project: "OCPBUGS"
-
-output:
-  report_dir: "./reports"
-
-slack:                       # future feature
-  webhook_url: ""
-  channel: "#edge-enablement-payload-manager"
-  enabled: false
-```
+| Setting | Default | Override |
+|---------|---------|----------|
+| Versions | 4.18, 4.19, 4.20, 4.21, 4.22, 4.23, 5.0 | `--versions` CLI flag |
+| Payloads per stream | 5 | — |
+| JIRA project | OCPBUGS | — |
+| Report directory | `./reports` | `--output` CLI flag |
 
 ### Environment Variables
 
@@ -141,7 +115,6 @@ Or add it to `~/.bashrc` / `~/.zshrc` for persistence.
 Usage: python -m payload_monitor [OPTIONS]
 
 Options:
-  --config PATH        Config file path (default: config.yaml)
   --versions TEXT      Override versions, comma-separated (e.g., "4.18,4.19")
   --output PATH        Output HTML file path (default: reports/report-YYYY-MM-DD.html)
   --from-json PATH     Regenerate HTML from a JSON file (skips data collection)
@@ -159,7 +132,7 @@ Options:
 | Source | API | Auth | Purpose |
 |--------|-----|------|---------|
 | [Release Controller](https://amd64.ocp.releases.ci.openshift.org) | `/api/v1/releasestream/*/tags` | None | Payload status, blocking/informing job results |
-| [Sippy](https://sippy.dptools.openshift.org) | `/api/releases`, `/api/jobs` | None | Version auto-discovery, job pass rates, regressions |
+| [Sippy](https://sippy.dptools.openshift.org) | `/api/jobs` | None | Job pass rates, regressions |
 | [Sippy Component Readiness](https://sippy.dptools.openshift.org/sippy-ng/component_readiness/main) | `/api/component_readiness` | None | HA vs Single Node topology regression detection |
 | [Prow](https://prow.ci.openshift.org) | Job API + GCS artifacts | None | Job logs, junit XMLs, failing test details |
 | [JIRA](https://redhat.atlassian.net) | REST API v3 | Token (read-only) | Existing bug search, bug creation links |
@@ -172,7 +145,7 @@ Jobs are classified by topology based on name patterns:
 - **TNA** (Two Node Active): `two-node`, `tna`
 - **TNF** (Two Nodes with Fencing): `tnf`, `two-node-fencing`
 
-These patterns are configurable in `config.yaml`.
+These patterns are defined in `payload_monitor/config.py`.
 
 ## Dashboard Features
 

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Edge Payload Monitor</title>
-  <style>{{ css }}</style>
+  <style>{{ css | safe }}</style>
 </head>
 <body>
 
@@ -509,6 +509,6 @@
 {% endfor %}
 {% endif %}
 
-<script>{{ js }}</script>
+<script>{{ js | safe }}</script>
 </body>
 </html>

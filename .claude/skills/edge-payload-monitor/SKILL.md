@@ -59,20 +59,20 @@ Parse `$ARGUMENTS` to determine options:
 
 ### Step 2: Install Prerequisites (if needed)
 
-Before running the tool, check if dependencies are already installed:
+The tool uses a virtual environment at `payload-monitor/.venv`. Create it and install dependencies if not already present:
 
 ```bash
-cd payload-monitor && python -c "import requests, jinja2, yaml, click" 2>/dev/null || pip install -r requirements.txt
+cd payload-monitor && (test -d .venv || python3 -m venv .venv) && .venv/bin/python -c "import requests, jinja2, click" 2>/dev/null || .venv/bin/pip install -r requirements.txt
 ```
 
-This avoids re-running `pip install` on every invocation when dependencies are already satisfied.
+This avoids re-creating the venv or re-running `pip install` on every invocation when the environment is already set up.
 
 ### Step 3: Run the Python Tool
 
 Run the payload monitor Python tool to collect data and generate the base report:
 
 ```bash
-cd payload-monitor && python -m payload_monitor --output reports/report-$(date +%Y-%m-%d).html [OPTIONS]
+cd payload-monitor && .venv/bin/python -m payload_monitor --output reports/report-$(date +%Y-%m-%d).html [OPTIONS]
 ```
 
 Pass through any relevant flags (`--versions`, `--skip-prow`, `--skip-sippy`).
@@ -164,7 +164,7 @@ This file is intentionally small — it contains only the AI analysis results, n
 Patch the analysis directly into the existing HTML report. Use the actual report path from Step 3:
 
 ```bash
-cd payload-monitor && python -m payload_monitor \
+cd payload-monitor && .venv/bin/python -m payload_monitor \
   --merge-analysis reports/<actual-analysis>.json \
   --output reports/<actual-report>.html
 ```

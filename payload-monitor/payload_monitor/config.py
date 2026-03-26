@@ -1,49 +1,31 @@
-"""Configuration loading."""
+"""Configuration defaults for Edge Payload Monitor."""
 
 from dataclasses import dataclass, field
-from pathlib import Path
-
-import yaml
-
 from typing import Optional
 
 from .models import Topology
 
-DEFAULT_CONFIG_PATH = Path(__file__).parent.parent / "config.yaml"
+# Hardcoded list of OCP versions to monitor
+VERSIONS = ["4.18", "4.19", "4.20", "4.21", "4.22", "4.23", "5.0"]
 
+TOPOLOGIES = [
+    Topology("SNO", ["sno", "single-node", "metal-single-node"], ["telco"], "SNO"),
+    Topology("TNA", ["two-node", "tna"], ["telco"], "Two Node with Arbiter"),
+    Topology("TNF", ["tnf", "two-node-fencing"], ["telco"], "Two Node Fencing"),
+]
 
-@dataclass
-class JiraConfig:
-    project: str = "OCPBUGS"
-    component: str = "Edge Enablement"
-
-
-@dataclass
-class OutputConfig:
-    report_dir: str = "./reports"
-
-
-@dataclass
-class SlackConfig:
-    webhook_url: str = ""
-    channel: str = ""
-    enabled: bool = False
-
-
-@dataclass
-class VersionsConfig:
-    auto_discover: bool = True
-    override: list[str] = field(default_factory=list)
+JIRA_PROJECT = "OCPBUGS"
+PAYLOADS_PER_STREAM = 5
+REPORT_DIR = "./reports"
 
 
 @dataclass
 class Config:
-    versions: VersionsConfig = field(default_factory=VersionsConfig)
-    topologies: list[Topology] = field(default_factory=list)
-    payloads_per_stream: int = 5
-    jira: JiraConfig = field(default_factory=JiraConfig)
-    output: OutputConfig = field(default_factory=OutputConfig)
-    slack: SlackConfig = field(default_factory=SlackConfig)
+    versions: list[str] = field(default_factory=lambda: list(VERSIONS))
+    topologies: list[Topology] = field(default_factory=lambda: list(TOPOLOGIES))
+    payloads_per_stream: int = PAYLOADS_PER_STREAM
+    jira_project: str = JIRA_PROJECT
+    report_dir: str = REPORT_DIR
 
     def classify_topology(self, job_name: str) -> Optional[str]:
         """Return the topology name if job_name matches any configured topology."""
@@ -58,68 +40,3 @@ class Config:
             if topo.name == topology_name:
                 return topo.jira_component
         return ""
-
-
-def load_config(path: Path | None = None) -> Config:
-    config_path = path or DEFAULT_CONFIG_PATH
-    if not config_path.exists():
-        return _default_config()
-
-    with open(config_path) as f:
-        raw = yaml.safe_load(f) or {}
-
-    return _parse_config(raw)
-
-
-def _default_config() -> Config:
-    return Config(
-        topologies=[
-            Topology("SNO", ["sno", "single-node", "metal-single-node"], ["telco"], "SNO"),
-            Topology("TNA", ["two-node", "tna"], ["telco"], "Two Node with Arbiter"),
-            Topology("TNF", ["tnf", "two-node-fencing"], ["telco"], "Two Node Fencing"),
-        ]
-    )
-
-
-def _parse_config(raw: dict) -> Config:
-    versions_raw = raw.get("versions", {})
-    versions = VersionsConfig(
-        auto_discover=versions_raw.get("auto_discover", True),
-        override=versions_raw.get("override", []),
-    )
-
-    topologies = []
-    for t in raw.get("topologies", []):
-        topologies.append(Topology(
-            name=t["name"],
-            job_patterns=t.get("job_patterns", []),
-            exclude_patterns=t.get("exclude_patterns", []),
-            jira_component=t.get("jira_component", ""),
-        ))
-    if not topologies:
-        topologies = _default_config().topologies
-
-    jira_raw = raw.get("jira", {})
-    jira = JiraConfig(
-        project=jira_raw.get("project", "OCPBUGS"),
-        component=jira_raw.get("component", "Edge Enablement"),
-    )
-
-    output_raw = raw.get("output", {})
-    output = OutputConfig(report_dir=output_raw.get("report_dir", "./reports"))
-
-    slack_raw = raw.get("slack", {})
-    slack = SlackConfig(
-        webhook_url=slack_raw.get("webhook_url", ""),
-        channel=slack_raw.get("channel", ""),
-        enabled=slack_raw.get("enabled", False),
-    )
-
-    return Config(
-        versions=versions,
-        topologies=topologies,
-        payloads_per_stream=raw.get("payloads_per_stream", 5),
-        jira=jira,
-        output=output,
-        slack=slack,
-    )

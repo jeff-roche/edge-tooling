@@ -60,7 +60,7 @@ def search_bugs(
     component = config.jira_component_for(topology) if topology else ""
     component_clause = f'AND component = "{component}" ' if component else ""
     jql = (
-        f'project = {config.jira.project} '
+        f'project = {config.jira_project} '
         f'{component_clause}'
         f'AND (summary ~ "{escaped}" OR description ~ "{escaped}") '
         f'AND status not in (Closed, "Release Pending") '
@@ -138,7 +138,7 @@ def create_bug_url(
 ) -> str:
     """Generate a JIRA create-issue URL with pre-populated fields."""
     params = {
-        "project.key": config.jira.project,
+        "project.key": config.jira_project,
         "issuetype.name": "Bug",
         "summary": title,
         "description": description,
