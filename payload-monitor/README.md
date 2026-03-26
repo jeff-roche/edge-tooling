@@ -21,12 +21,6 @@ python -m payload_monitor --versions 4.18,4.19,4.20,4.21,4.22,4.23
 python -m payload_monitor --merge-analysis reports/analysis-2026-03-25.json --output reports/report-2026-03-25.html
 ```
 
-Or use the convenience wrapper:
-
-```bash
-./payload-monitor.sh
-```
-
 ## What It Does
 
 1. **Fetches nightly payloads** from the [amd64 release controller](https://amd64.ocp.releases.ci.openshift.org) for OCP nightly streams (4.18 through 5.0 by default, overridable with `--versions`)
