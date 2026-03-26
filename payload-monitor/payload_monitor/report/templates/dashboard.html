@@ -288,7 +288,10 @@
     {% else %}
     <div class="claude-suggestion">
       For deeper analysis, use Claude directly:<br>
-      <code>/ci:prow-job-analyze-test-failure {{ detail.job.prow_url }}</code>
+      <div class="cmd-copy-row">
+        <code>/ci:prow-job-analyze-test-failure {{ detail.job.prow_url }}</code>
+        <button class="copy-btn" onclick="copyCommand(this)" title="Copy to clipboard">Copy</button>
+      </div>
     </div>
     {% endif %}
 
@@ -497,7 +500,10 @@
   </div>
   <div class="claude-cmd-popup" style="display:none;margin-top:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 12px">
     <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">Run in Claude Code to get detailed analysis for the bug description:</div>
-    <code style="font-size:12px;word-break:break-all">/ci:prow-job-analyze-test-failure {{ bug.prow_url }}</code>
+    <div class="cmd-copy-row">
+      <code style="font-size:12px;word-break:break-all">/ci:prow-job-analyze-test-failure {{ bug.prow_url }}</code>
+      <button class="copy-btn" onclick="copyCommand(this)" title="Copy to clipboard">Copy</button>
+    </div>
   </div>
 </div>
 {% endfor %}

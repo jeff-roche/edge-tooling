@@ -379,6 +379,30 @@ details pre {
   font-size: 12px;
   color: var(--accent);
 }
+.cmd-copy-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.cmd-copy-row code { margin-top: 0; }
+.copy-btn {
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.15s, background 0.15s;
+  opacity: 0;
+  white-space: nowrap;
+}
+.claude-suggestion:hover .copy-btn,
+.claude-cmd-popup:hover .copy-btn { opacity: 1; }
+.copy-btn:hover { background: var(--surface-hover); }
+.copy-btn.copied { opacity: 1; color: var(--green); border-color: var(--green); }
 
 /* Regressions */
 .regression-row { border-left: 3px solid var(--red); }

@@ -204,6 +204,20 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
+  // Copy command to clipboard
+  window.copyCommand = function(btn) {
+    var code = btn.closest('.cmd-copy-row').querySelector('code');
+    if (!code) return;
+    navigator.clipboard.writeText(code.textContent.trim()).then(function() {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(function() {
+        btn.textContent = 'Copy';
+        btn.classList.remove('copied');
+      }, 2000);
+    });
+  };
+
   // Draggable column resizers
   document.querySelectorAll('table').forEach(table => {
     const headers = table.querySelectorAll('th');
