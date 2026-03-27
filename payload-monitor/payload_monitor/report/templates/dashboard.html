@@ -45,6 +45,17 @@
 </div>
 {% endif %}
 
+{% if report.data_errors %}
+<div class="error-banner">
+  <strong>Data collection errors:</strong> Some data sources failed. The report may be incomplete.
+  <ul>
+    {% for err in report.data_errors %}
+    <li>{{ err }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
 <!-- Overview: Timeline + Summary Cards side by side -->
 <div class="overview-layout">
   <div class="overview-left">
@@ -56,16 +67,16 @@
         <div class="timeline-dots">
           {% for payload in stream.payloads | reverse %}
           <a href="{{ payload.url }}" target="_blank"
-             class="timeline-dot {{ payload.phase | lower }}"
-             title="{{ payload.tag }} — {{ payload.phase }}">
+             class="timeline-dot {{ payload.status.value | lower }}"
+             title="{{ payload.tag }} — {{ payload.status.value }}">
             <span class="tooltip">
               {{ payload.tag }}<br>
-              {{ payload.phase }}
+              {{ payload.status.value }}
               {% if payload.failing_edge_jobs %}
               <br>{{ payload.failing_edge_jobs | length }} edge failure{{ 's' if payload.failing_edge_jobs | length != 1 else '' }}
               {% endif %}
             </span>
-            {% if payload.phase == 'Accepted' %}A{% else %}R{% endif %}
+            {{ 'A' if payload.status.value == 'Accepted' else 'R' if payload.status.value == 'Rejected' else 'P' }}
           </a>
           {% endfor %}
         </div>
@@ -86,7 +97,7 @@
           {% if failing_count == 0 %}Healthy{% elif failing_count <= 2 %}Degraded{% else %}Failing{% endif %}
         </div>
         <div class="detail">
-          Latest: <span style="color:{% if latest.phase == 'Accepted' %}var(--green){% elif latest.phase == 'Rejected' %}var(--red){% else %}var(--text-muted){% endif %}">{{ latest.phase }}</span>
+          Latest: <span style="color:{% if latest.status.value == 'Accepted' %}var(--green){% elif latest.status.value == 'Rejected' %}var(--red){% else %}var(--text-muted){% endif %}">{{ latest.status.value }}</span>
           <br>{{ failing_count }} edge failure{{ 's' if failing_count != 1 else '' }} in last {{ stream.payloads | length }} builds
         </div>
         {% else %}
@@ -94,6 +105,12 @@
         {% endif %}
       </div>
       {% endfor %}
+    </div>
+    <div class="status-legend">
+      <span class="legend-item"><span class="legend-dot healthy"></span> Healthy: 0 edge failures</span>
+      <span class="legend-item"><span class="legend-dot degraded"></span> Degraded: 1–2 edge failures</span>
+      <span class="legend-item"><span class="legend-dot failing"></span> Failing: 3+ edge failures</span>
+      <span class="legend-hint">Edge failures counted across last {{ report.streams[0].payloads | length if report.streams else 5 }} payloads per stream</span>
     </div>
   </div>
 </div>
@@ -119,7 +136,7 @@
 {% for stream in report.streams %}
   {% for p in stream.payloads %}
     {% set ns.total_payloads = ns.total_payloads + 1 %}
-    {% if p.phase == 'Rejected' %}{% set ns.rejected_payloads = ns.rejected_payloads + 1 %}{% endif %}
+    {% if p.status.value == 'Rejected' %}{% set ns.rejected_payloads = ns.rejected_payloads + 1 %}{% endif %}
   {% endfor %}
 {% endfor %}
 
@@ -283,6 +300,13 @@
       <div class="da-field">
         <span class="da-label">Recommendation:</span>
         <span>{{ detail.job.deep_analysis.recommendation }}</span>
+      </div>
+      <div class="claude-suggestion" style="margin-top:12px">
+        Investigate suspect PRs in this payload:<br>
+        <div class="cmd-copy-row">
+          <code>/ci:fetch-new-prs-in-payload {{ detail.payload_tag }}</code>
+          <button class="copy-btn" onclick="copyCommand(this)" title="Copy to clipboard">Copy</button>
+        </div>
       </div>
     </div>
     {% else %}
@@ -496,6 +520,7 @@
   {% endif %}
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
     <a href="{{ bug.create_url }}" target="_blank" class="create-btn">Create in JIRA</a>
+    <button class="create-btn copy-desc-btn" style="background:rgba(88,166,255,0.1);color:var(--accent);border:1px solid var(--accent)" data-description="{{ bug.full_description | e }}">Copy Full Description</button>
     <button class="create-btn" style="background:rgba(88,166,255,0.1);color:var(--accent);border:1px solid var(--accent)" onclick="var el=this.closest('.suggest-card').querySelector('.claude-cmd-popup');el.style.display=el.style.display==='none'?'block':'none'">Gather Details with Claude</button>
   </div>
   <div class="claude-cmd-popup" style="display:none;margin-top:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 12px">

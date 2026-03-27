@@ -60,6 +60,20 @@ a:hover { text-decoration: underline; }
   margin: 0 2px;
 }
 
+.error-banner {
+  background: rgba(248,81,73,0.1);
+  border: 1px solid var(--red);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--red);
+}
+.error-banner ul {
+  margin: 6px 0 0 20px;
+  color: var(--text-muted);
+}
+
 /* Overview layout: timeline + summary side by side */
 .overview-layout {
   display: flex;
@@ -93,6 +107,13 @@ a:hover { text-decoration: underline; }
 .summary-card .status.degraded { color: var(--yellow); }
 .summary-card .status.failing { color: var(--red); }
 .summary-card .detail { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+.status-legend { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; font-size: 12px; color: var(--text-muted); }
+.legend-item { display: inline-flex; align-items: center; gap: 4px; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.legend-dot.healthy { background: var(--green); }
+.legend-dot.degraded { background: var(--yellow); }
+.legend-dot.failing { background: var(--red); }
+.legend-hint { font-style: italic; font-size: 11px; width: 100%; }
 
 /* Findings summary */
 .findings-summary {
@@ -290,7 +311,7 @@ details pre {
   line-height: 1.4;
   color: var(--text-muted);
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: break-word;
   max-height: 300px;
   overflow-y: auto;
 }

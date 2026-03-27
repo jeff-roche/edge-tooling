@@ -10,8 +10,8 @@ VERSIONS = ["4.18", "4.19", "4.20", "4.21", "4.22", "4.23", "5.0"]
 
 TOPOLOGIES = [
     Topology("SNO", ["sno", "single-node", "metal-single-node"], ["telco"], "SNO"),
-    Topology("TNA", ["two-node", "tna"], ["telco"], "Two Node with Arbiter"),
-    Topology("TNF", ["tnf", "two-node-fencing"], ["telco"], "Two Node Fencing"),
+    Topology("TNA", ["tna", "arbiter"], ["telco"], "Two Node with Arbiter"),
+    Topology("TNF", ["tnf", "fencing"], ["telco"], "Two Node Fencing"),
 ]
 
 JIRA_PROJECT = "OCPBUGS"

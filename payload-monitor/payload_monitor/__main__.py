@@ -1,6 +1,7 @@
 """CLI entry point for Edge Payload Monitor."""
 
 import logging
+import re
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -30,6 +31,26 @@ def _setup_logging(verbose: bool) -> None:
         format="%(asctime)s %(levelname)-5s %(name)s — %(message)s",
         datefmt="%H:%M:%S",
     )
+
+
+def _collect_blocking_jobs(report: MonitorReport) -> list[dict]:
+    """Collect blocking edge job failures from the report.
+
+    Returns a list of dicts with keys: name, prow_url, topology, version, payload_tag.
+    """
+    blocking = []
+    for stream in report.streams:
+        for payload in stream.payloads:
+            for j in payload.edge_jobs:
+                if j.result == JobResult.FAILURE and j.job_type == JobType.BLOCKING:
+                    blocking.append({
+                        "name": j.name,
+                        "prow_url": j.prow_url,
+                        "topology": j.topology or "",
+                        "version": stream.version,
+                        "payload_tag": payload.tag,
+                    })
+    return blocking
 
 
 @click.command()
@@ -100,7 +121,15 @@ def main(
 
     # Override versions if specified
     if versions:
-        config.versions = [v.strip() for v in versions.split(",")]
+        parsed = [v.strip() for v in versions.split(",") if v.strip()]
+        if not parsed:
+            logger.error("--versions provided but no valid versions found")
+            raise SystemExit(1)
+        invalid = [v for v in parsed if not re.match(r'^\d+\.\d+$', v)]
+        if invalid:
+            logger.error(f"Invalid version format: {', '.join(invalid)} (expected X.Y, e.g., 4.19)")
+            raise SystemExit(1)
+        config.versions = parsed
 
     logger.info("Starting Edge Payload Monitor")
 
@@ -113,6 +142,7 @@ def main(
     # Step 2: Collect data in parallel — RC payloads, Sippy regressions, and
     # Component Readiness are all independent once the version list is known.
     logger.info("Step 2: Collecting data (RC payloads, Sippy, Component Readiness)...")
+    data_errors = []
     with ThreadPoolExecutor(max_workers=3) as pool:
         rc_future = pool.submit(collect_payloads, config, stream_names)
 
@@ -120,13 +150,32 @@ def main(
             sippy_future = pool.submit(sippy.collect, config, active_versions)
             cr_future = pool.submit(component_readiness.collect, active_versions)
 
-        stream_reports = rc_future.result()
+        try:
+            stream_reports = rc_future.result()
+        except Exception as e:
+            logger.error(f"Release Controller collection failed: {e}")
+            data_errors.append(f"Release Controller: {e}")
+            stream_reports = []
+
+        empty_streams = [s.version for s in stream_reports if not s.payloads]
+        if empty_streams:
+            logger.warning(f"No payload data for versions: {', '.join(empty_streams)}")
 
         if not skip_sippy:
-            sippy_regressions = sippy_future.result()
-            for stream in stream_reports:
-                stream.regressions = sippy_regressions.get(stream.version, [])
-            comp_regs = cr_future.result()
+            try:
+                sippy_regressions = sippy_future.result()
+                for stream in stream_reports:
+                    stream.regressions = sippy_regressions.get(stream.version, [])
+            except Exception as e:
+                logger.error(f"Sippy collection failed: {e}")
+                data_errors.append(f"Sippy: {e}")
+
+            try:
+                comp_regs = cr_future.result()
+            except Exception as e:
+                logger.error(f"Component Readiness collection failed: {e}")
+                data_errors.append(f"Component Readiness: {e}")
+                comp_regs = []
         else:
             logger.info("  Skipping Sippy/Component Readiness (--skip-sippy)")
             comp_regs = []
@@ -148,6 +197,7 @@ def main(
         component_regressions=comp_regs,
         skip_prow=skip_prow,
         skip_sippy=skip_sippy,
+        data_errors=data_errors,
     )
 
     # Step 4: Analyze and find JIRA matches
@@ -170,18 +220,11 @@ def main(
     logger.info(f"Report: {html_path.resolve()}")
 
     # Print blocking job summary to stdout for skill consumption
-    blocking = []
-    for stream in report.streams:
-        for payload in stream.payloads:
-            for j in payload.edge_jobs:
-                if j.result == JobResult.FAILURE and j.job_type == JobType.BLOCKING:
-                    blocking.append(
-                        f"BLOCKING|{j.name}|{j.prow_url}|{j.topology or ''}|{stream.version}|{payload.tag}"
-                    )
+    blocking = _collect_blocking_jobs(report)
     if blocking:
         print("BLOCKING_JOBS_START")
-        for line in blocking:
-            print(line)
+        for b in blocking:
+            print(f"BLOCKING|{b['name']}|{b['prow_url']}|{b['topology']}|{b['version']}|{b['payload_tag']}")
         print("BLOCKING_JOBS_END")
 
     if open_browser:

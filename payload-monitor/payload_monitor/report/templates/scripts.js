@@ -52,11 +52,17 @@ document.addEventListener('DOMContentLoaded', function() {
     if (hasFilters) {
       sectionsCollapsed.jobs = false;
       sectionsCollapsed.details = false;
+      sectionsCollapsed.regressions = false;
+      sectionsCollapsed.cr = false;
       applyCollapse();
       const jobsBtn = document.getElementById('expand-jobs-btn');
       const detailsBtn = document.getElementById('expand-details-btn');
+      const regressionsBtn = document.getElementById('expand-regressions-btn');
+      const crBtn = document.getElementById('expand-cr-btn');
       if (jobsBtn) jobsBtn.textContent = 'Show top ' + INITIAL_VISIBLE + ' only';
       if (detailsBtn) detailsBtn.textContent = 'Show top ' + INITIAL_VISIBLE + ' only';
+      if (regressionsBtn) regressionsBtn.textContent = 'Show top ' + INITIAL_VISIBLE + ' only';
+      if (crBtn) crBtn.textContent = 'Show top ' + INITIAL_VISIBLE + ' only';
     }
 
     function isVisible(row) {
@@ -188,19 +194,21 @@ document.addEventListener('DOMContentLoaded', function() {
       this.classList.add(isAsc ? 'desc' : 'asc');
       const dir = isAsc ? -1 : 1;
 
+      const numericCell = /^[-+]?\d+(\.\d+)?%?$/;
       rows.sort((a, b) => {
         const aText = (a.children[col]?.textContent || '').trim().toLowerCase();
         const bText = (b.children[col]?.textContent || '').trim().toLowerCase();
-        // Try numeric comparison for columns like pass rates and runs
-        const aNum = parseFloat(aText);
-        const bNum = parseFloat(bText);
-        if (!isNaN(aNum) && !isNaN(bNum)) {
-          return (aNum - bNum) * dir;
+        if (numericCell.test(aText) && numericCell.test(bText)) {
+          return (parseFloat(aText) - parseFloat(bText)) * dir;
         }
-        return aText < bText ? -dir : aText > bText ? dir : 0;
+        return aText.localeCompare(bText) * dir;
       });
 
-      rows.forEach(row => tbody.appendChild(row));
+      rows.forEach((row, index) => {
+        row.dataset.rowIndex = String(index + 1);
+        tbody.appendChild(row);
+      });
+      applyCollapse();
     });
   });
 
@@ -257,6 +265,27 @@ document.addEventListener('DOMContentLoaded', function() {
 
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
+      });
+    });
+  });
+
+  // Copy full bug description to clipboard
+  document.querySelectorAll('.copy-desc-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var text = this.dataset.description;
+      // Decode HTML entities (safe: off-screen textarea, never rendered)
+      var tmp = document.createElement('textarea');
+      tmp.innerHTML = text;
+      navigator.clipboard.writeText(tmp.value).then(function() {
+        var original = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.style.color = 'var(--green)';
+        btn.style.borderColor = 'var(--green)';
+        setTimeout(function() {
+          btn.textContent = original;
+          btn.style.color = '';
+          btn.style.borderColor = '';
+        }, 2000);
       });
     });
   });

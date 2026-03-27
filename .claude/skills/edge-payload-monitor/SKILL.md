@@ -21,7 +21,6 @@ This skill composes with the following installed marketplace CI skills from the 
 | `ci:fetch-test-report` | Fetch test report from Sippy with pass rates, test ID, and Jira component — use for per-test regression detail |
 | `ci:fetch-job-run-summary` | Fetch a Prow job run summary with all failed tests grouped by SIG — use to understand failure scope |
 | `ci:fetch-prowjob-json` | Fetch key data from a Prow job's prowjob.json artifact — use for job metadata |
-| `ci:fetch-new-prs-in-payload` | Fetch PRs new in a payload compared to previous — use to identify suspect PRs causing regressions |
 | `ci:fetch-regression-details` | Fetch detailed Component Readiness regression info from Sippy — use for Sippy regressions |
 | `ci:fetch-related-triages` | Fetch existing triages and untriaged regressions related to a given regression — use to avoid duplicate work |
 | `ci:fetch-jira-issue` | Fetch JIRA issue details including status, assignee, comments, and progress classification — use for enriched bug context |
@@ -123,7 +122,6 @@ Then based on failure type:
 - If resource/state failure (etcd issues, operator degraded, node not ready):
   Use `ci:prow-job-analyze-resource`
 
-For payload context: use `ci:fetch-new-prs-in-payload` to identify suspect PRs.
 For JIRA context: use `ci:fetch-jira-issue` for any linked bugs.
 
 Return ONLY a JSON object with these fields:
@@ -138,6 +136,22 @@ Return ONLY a JSON object with these fields:
 ```
 
 When using subagents, launch all in parallel using multiple Agent tool calls in the same response. Collect their results and proceed to Step 5.
+
+**Subagent configuration:** When spawning subagents, set a timeout of 5 minutes per agent. If a subagent times out or returns an error:
+
+1. Record the failure in the analysis JSON with a descriptive error:
+   ```json
+   {
+     "prow_url": "{prow_url}",
+     "root_cause": "Analysis timed out or failed: {error_message}",
+     "failure_type": "Analysis error",
+     "impact": "Unable to determine — manual investigation needed",
+     "suspect_prs": [],
+     "recommendation": "Run /ci:prow-job-analyze-test-failure {prow_url} manually for detailed analysis"
+   }
+   ```
+2. Continue with results from other subagents — do NOT discard partial results.
+3. Include a note in the final output indicating which jobs could not be analyzed.
 
 ### Step 5: Write Analysis File
 
@@ -172,6 +186,16 @@ cd payload-monitor && .venv/bin/python -m payload_monitor \
 This finds each job's detail section by its prow URL and injects the "AI Root Cause Analysis" card directly into the HTML. No JSON round-trip needed.
 
 If there were no blocking failures (no analysis file), skip this step entirely — the HTML report is already complete.
+
+### Step 6b: Clean Up Analysis File
+
+After successfully patching the analysis into the HTML report, delete the intermediate analysis JSON file:
+
+```bash
+rm payload-monitor/reports/<actual-analysis>.json
+```
+
+This file has served its purpose — the analysis is now embedded in the HTML report.
 
 ### Step 7: Present Output
 

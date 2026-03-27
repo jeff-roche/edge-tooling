@@ -7,6 +7,7 @@ import re
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -23,6 +24,7 @@ from ..models import (
     PayloadStatus,
     Regression,
     StreamReport,
+    SuggestedBug,
 )
 
 logger = logging.getLogger(__name__)
@@ -158,7 +160,7 @@ def generate_json(report: MonitorReport, output_path: Path) -> None:
             payload_data = {
                 "tag": payload.tag,
                 "status": payload.status.value,
-                "phase": payload.phase,
+                "phase": payload.status.value,
                 "url": payload.url,
                 "edge_jobs": [],
             }
@@ -185,6 +187,16 @@ def generate_json(report: MonitorReport, output_path: Path) -> None:
 
 
 
+def _safe_urls(urls: list[str]) -> list[str]:
+    """Filter URLs to only allow http/https schemes."""
+    safe = []
+    for url in urls:
+        parsed = urlparse(url)
+        if parsed.scheme == "https" and parsed.netloc:
+            safe.append(url)
+    return safe
+
+
 def _render_analysis_card(da: dict) -> str:
     """Render an AI analysis card as an HTML string."""
     e = html.escape
@@ -204,7 +216,7 @@ def _render_analysis_card(da: dict) -> str:
         f'    <span>{e(da.get("impact", ""))}</span>',
         '  </div>',
     ]
-    prs = da.get("suspect_prs", [])
+    prs = _safe_urls(da.get("suspect_prs", []))
     if prs:
         parts.append('  <div class="da-field">')
         parts.append('    <span class="da-label">Suspect PRs:</span>')
@@ -250,8 +262,13 @@ def patch_analysis_html(html_path: Path, analysis_path: Path) -> None:
             r'(\s*)'
             r'(?:<div class="claude-suggestion">.*?</div>\s*)?'
         )
-        replacement = rf'\1\2{card_html}\n'
-        new_content, count = re.subn(pattern, replacement, content, count=1, flags=re.DOTALL)
+        new_content, count = re.subn(
+            pattern,
+            lambda m: f"{m.group(1)}{m.group(2)}{card_html}\n",
+            content,
+            count=1,
+            flags=re.DOTALL,
+        )
         if count:
             content = new_content
             patched += 1
@@ -314,7 +331,7 @@ def merge_analysis(report: MonitorReport, analysis_path: Path) -> None:
                         root_cause=da.get("root_cause", ""),
                         failure_type=da.get("failure_type", ""),
                         impact=da.get("impact", ""),
-                        suspect_prs=da.get("suspect_prs", []),
+                        suspect_prs=_safe_urls(da.get("suspect_prs", [])),
                         recommendation=da.get("recommendation", ""),
                     )
                     merged += 1
@@ -340,7 +357,7 @@ def load_json(json_path: Path) -> MonitorReport:
                         root_cause=da_raw.get("root_cause", ""),
                         failure_type=da_raw.get("failure_type", ""),
                         impact=da_raw.get("impact", ""),
-                        suspect_prs=da_raw.get("suspect_prs", []),
+                        suspect_prs=_safe_urls(da_raw.get("suspect_prs", [])),
                         recommendation=da_raw.get("recommendation", ""),
                     )
                 failing_tests = [
@@ -349,11 +366,10 @@ def load_json(json_path: Path) -> MonitorReport:
                 ]
                 jobs.append(JobRun(
                     name=j.get("name", ""),
-                    url=j.get("prow_url", ""),
+                    prow_url=j.get("prow_url", ""),
                     result=JobResult(j.get("result", "U")),
                     job_type=JobType(j.get("job_type", "informing")),
                     topology=j.get("topology"),
-                    prow_url=j.get("prow_url", ""),
                     failing_tests=failing_tests,
                     error_summary=j.get("error_summary", ""),
                     deep_analysis=deep_analysis,
@@ -363,7 +379,6 @@ def load_json(json_path: Path) -> MonitorReport:
                 stream=s.get("stream", ""),
                 version=s.get("version", ""),
                 status=PayloadStatus(p.get("status", "Pending")),
-                phase=p.get("phase", ""),
                 url=p.get("url", ""),
                 jobs=jobs,
             ))

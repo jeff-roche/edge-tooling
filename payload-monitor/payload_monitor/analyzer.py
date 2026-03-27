@@ -77,7 +77,7 @@ def analyze(
         name: count for name, count in failure_counts.items() if count > 1
     }
     if recurring:
-        logger.info(f"Recurring edge failures (appeared in >1 payload):")
+        logger.info("Recurring edge failures (appeared in >1 payload):")
         for name, count in sorted(recurring.items(), key=lambda x: -x[1]):
             logger.info(f"  {name}: {count} payloads")
 

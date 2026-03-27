@@ -55,13 +55,14 @@ def _parse_jobs(
     runs = []
     for name, info in jobs_dict.items():
         topology = config.classify_topology(name)
+        if topology is None:
+            continue
         runs.append(JobRun(
             name=name,
-            url=info.get("url", ""),
+            prow_url=info.get("url", ""),
             result=_parse_job_result(info.get("state", "")),
             job_type=job_type,
             topology=topology,
-            prow_url=info.get("url", ""),
         ))
     return runs
 
@@ -132,7 +133,6 @@ def fetch_payload(stream: str, tag_data: dict, config: Config) -> Payload:
         stream=stream,
         version=version,
         status=_parse_phase(tag_data.get("phase", "")),
-        phase=tag_data.get("phase", ""),
         url=release_url,
         jobs=jobs,
     )
@@ -143,6 +143,10 @@ def _collect_stream(stream: str, config: Config) -> StreamReport:
     version = stream.split(".0-0.nightly")[0]
     logger.info(f"Collecting payloads for {stream}")
     tags = fetch_tags(stream, limit=config.payloads_per_stream)
+
+    if not tags:
+        logger.warning(f"No payloads found for {stream} -- stream may not exist or has no accepted/rejected payloads")
+        return StreamReport(stream=stream, version=version, payloads=[])
 
     # Fetch all tag details in parallel
     payloads = []
@@ -164,7 +168,7 @@ def _collect_stream(stream: str, config: Config) -> StreamReport:
         if edge_jobs:
             failing = payload.failing_edge_jobs
             logger.info(
-                f"  {payload.tag}: {payload.phase} — "
+                f"  {payload.tag}: {payload.status.value} — "
                 f"{len(edge_jobs)} edge jobs, {len(failing)} failing"
             )
 

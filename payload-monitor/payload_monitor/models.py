@@ -1,5 +1,6 @@
 """Data models for payload monitoring."""
 
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
@@ -34,7 +35,10 @@ class Topology:
         job_lower = job_name.lower()
         if any(p in job_lower for p in self.exclude_patterns):
             return False
-        return any(p in job_lower for p in self.job_patterns)
+        return any(
+            re.search(rf'(?:^|[-_]){re.escape(p)}(?:[-_]|$)', job_lower)
+            for p in self.job_patterns
+        )
 
 
 @dataclass
@@ -56,11 +60,10 @@ class FailingTest:
 @dataclass
 class JobRun:
     name: str
-    url: str
+    prow_url: str
     result: JobResult
     job_type: JobType
     topology: Optional[str] = None
-    prow_url: str = ""
     failing_tests: list[FailingTest] = field(default_factory=list)
     error_summary: str = ""
     deep_analysis: Optional[DeepAnalysis] = None
@@ -72,17 +75,16 @@ class Payload:
     stream: str
     version: str
     status: PayloadStatus
-    phase: str = ""
     url: str = ""
     jobs: list[JobRun] = field(default_factory=list)
 
     @property
     def edge_jobs(self) -> list[JobRun]:
-        return [j for j in self.jobs if j.topology is not None]
+        return self.jobs
 
     @property
     def failing_edge_jobs(self) -> list[JobRun]:
-        return [j for j in self.edge_jobs if j.result == JobResult.FAILURE]
+        return [j for j in self.jobs if j.result == JobResult.FAILURE]
 
 
 @dataclass
@@ -144,6 +146,7 @@ class SuggestedBug:
     failing_tests: list[str] = field(default_factory=list)
     create_url: str = ""
     prow_url: str = ""
+    full_description: str = ""
 
 
 @dataclass
@@ -172,3 +175,4 @@ class MonitorReport:
     skip_prow: bool = False
     skip_sippy: bool = False
     skip_jira: bool = False
+    data_errors: list[str] = field(default_factory=list)

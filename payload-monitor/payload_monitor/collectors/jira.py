@@ -160,33 +160,38 @@ def suggest_bug(
     versions_str = ", ".join(versions)
     title = f"[{job.topology}] {job.name} failing in {versions_str} nightly"
 
-    description_lines = [
+    # Short description for URL (avoids browser URL length limits)
+    short_lines = [
         f"*Job*: [{job.name}|{job.prow_url}]",
         f"*Topology*: {job.topology}",
         f"*Versions*: {versions_str}",
         f"*Job Type*: {job.job_type.value}",
-        "",
-        "*Failing Tests*:",
     ]
+    short_description = "\n".join(short_lines)
+
+    # Full description for clipboard copy
+    full_lines = list(short_lines)
+    full_lines.append("")
+    full_lines.append("*Failing Tests*:")
     for t in job.failing_tests[:5]:
-        description_lines.append(f"- {t.name}")
+        full_lines.append(f"- {t.name}")
         if t.error_message:
-            # Truncate error for JIRA
             err = t.error_message[:200].replace("\n", " ")
-            description_lines.append(f"  {{noformat}}{err}{{noformat}}")
+            full_lines.append(f"  {{noformat}}{err}{{noformat}}")
 
     if job.error_summary:
-        description_lines.extend(["", f"*Error Summary*: {job.error_summary}"])
+        full_lines.extend(["", f"*Error Summary*: {job.error_summary}"])
 
-    description = "\n".join(description_lines)
+    full_description = "\n".join(full_lines)
 
     return SuggestedBug(
         title=title,
-        description=description,
+        description=short_description,
         job_name=job.name,
         topology=job.topology or "",
         versions=versions,
         failing_tests=failing_test_names,
-        create_url=create_bug_url(title, description, config, component=component),
+        create_url=create_bug_url(title, short_description, config, component=component),
         prow_url=job.prow_url,
+        full_description=full_description,
     )
