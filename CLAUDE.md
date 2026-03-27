@@ -13,6 +13,7 @@ Edge Tooling is a multi-tool deployment and development toolkit for OpenShift an
 | Two-Node Toolbox | `two-node-toolbox/` | OpenShift two-node cluster deployment (arbiter/fencing topologies) |
 | EC2 Deploy | `ec2-deploy/` | Standalone EC2 instance setup for development |
 | SNO Deploy | `sno-deploy/` | Single Node OpenShift with DU configuration |
+| Payload Monitor | `payload-monitor/` | Nightly payload health monitoring for edge topologies (SNO/TNA/TNF) |
 | LVM Operator Environment | `environments/lvm-operator/` | Development workspace template for LVMS |
 
 ## Getting Started - Use Case Guide
@@ -22,6 +23,7 @@ Edge Tooling is a multi-tool deployment and development toolkit for OpenShift an
 - **Need a two-node HA OpenShift cluster?** → Use Two-Node Toolbox
 - **Need a standalone EC2 development host?** → Use EC2 Deploy
 - **Need a single-node OpenShift with DU config?** → Use SNO Deploy
+- **Monitor nightly payload health for edge topologies?** → Use Payload Monitor
 - **Developing the LVM Operator?** → Use LVM Operator Environment
 
 **Common workflow:** Deploy an EC2 instance with `ec2-deploy/`, then use `two-node-toolbox/` to deploy a cluster on that instance.
@@ -225,6 +227,14 @@ All cluster files are stored in `~/.sno-deploy/$CLUSTER/`:
 - `creds/` - kubeconfig, kubeadmin-password
 - `workdir/` - Intermediate files
 - `$CLUSTER.env` - Cluster environment file
+
+---
+
+## Payload Monitor (payload-monitor/)
+
+Automated monitoring tool for OpenShift nightly payload health across edge topologies (SNO, TNA, TNF). Produces an interactive HTML dashboard with optional AI-powered root cause analysis via the `/edge-payload-monitor` Claude Code skill.
+
+For full documentation, architecture, CLI reference, and configuration details, see `payload-monitor/README.md`.
 
 ---
 

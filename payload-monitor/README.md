@@ -64,8 +64,12 @@ python -m payload_monitor --merge-analysis reports/analysis-2026-03-25.json --ou
 
 ### Performance and Token Efficiency
 
-- **Parallel data collection**: Release Controller, Sippy, and Component Readiness APIs are queried concurrently. Per-stream payload fetches are also parallelized.
-- **Shared HTTP sessions**: All collectors reuse persistent connections with automatic retry and exponential backoff for transient failures.
+- **Parallel data collection**: All data sources are queried concurrently using `ThreadPoolExecutor`:
+  - Release Controller, Sippy, and Component Readiness APIs run in parallel (`__main__.py`)
+  - Per-stream payload tag detail fetches run concurrently within each stream (`collectors/release_controller.py`)
+  - Prow artifact enrichment (junit XML downloads) runs across failing jobs in parallel (`collectors/prow.py`)
+  - JIRA bug searches run concurrently across all unique failing jobs (`collectors/jira.py`)
+- **Shared HTTP sessions**: All collectors reuse persistent `requests.Session` instances with automatic retry (3 attempts) and exponential backoff for transient failures (429, 5xx).
 - **No JSON round-trip**: AI analysis is patched directly into the existing HTML report instead of serializing/deserializing the full report data through JSON.
 - **Minimal AI input**: Blocking job data is emitted to stdout via structured markers (`BLOCKING_JOBS_START`/`BLOCKING_JOBS_END`) — Claude reads only job names and Prow URLs, never the full report data. Deep analysis runs only on blocking job failures; informing jobs get a lightweight Claude suggestion instead.
 - **Multi-agent parallelism**: When multiple blocking jobs need analysis, each is analyzed by a separate subagent in parallel.

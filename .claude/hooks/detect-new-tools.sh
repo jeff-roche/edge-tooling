@@ -24,6 +24,7 @@ DOCUMENTED_TOOLS=(
     "two-node-toolbox"
     "ec2-deploy"
     "sno-deploy"
+    "payload-monitor"
     "environments/lvm-operator"
 )
 
