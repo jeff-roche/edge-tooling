@@ -13,7 +13,7 @@ from .analyzer import analyze
 from .collectors import component_readiness, prow, sippy
 from .collectors.release_controller import collect as collect_payloads, discover_streams
 from .config import Config
-from .models import MonitorReport
+from .models import JobResult, JobType, MonitorReport
 from .report.generator import (
     generate_html,
     generate_json,
@@ -21,7 +21,6 @@ from .report.generator import (
     merge_analysis,
     patch_analysis_html,
 )
-from .models import JobResult, JobType
 
 
 def _setup_logging(verbose: bool) -> None:

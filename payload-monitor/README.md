@@ -17,7 +17,7 @@ python -m payload_monitor --open
 # Override versions
 python -m payload_monitor --versions 4.18,4.19,4.20,4.21,4.22,4.23
 
-# Patch AI analysis into an existing HTML report
+# Patch AI analysis into an existing HTML report (the HTML file must already exist)
 python -m payload_monitor --merge-analysis reports/analysis-2026-03-25.json --output reports/report-2026-03-25.html
 ```
 
@@ -38,22 +38,24 @@ python -m payload_monitor --merge-analysis reports/analysis-2026-03-25.json --ou
                     |   CLI / Skill     |
                     +--------+----------+
                              |
-                    +--------v----------+
-                    |   Analyzer        |
-                    +--------+----------+
-                             |
      +------------+----------+----------+------------+
      |            |          |          |             |
 +----v-------+ +--v------+ +v--------+ +v----------+ +v-----------+
-| Release    | | Sippy   | | Comp.   | | JIRA      | | Prow       |
-| Controller | | Jobs    | | Ready.  | | Collector | | Collector  |
-+----+-------+ +---------+ +---------+ +-----------+ +-----+------+
-     |                                                      |
-     +------------------------------------------------------+
-                             |
-                    +--------v----------+
-                    |  HTML Dashboard   |
-                    +-------------------+
+| Release    | | Sippy   | | Comp.   | | Prow       | | JIRA      |
+| Controller | | Jobs    | | Ready.  | | Collector  | | Collector |
++----+-------+ +---------+ +---------+ +-----+------+ +-----------+
+     |                                        |              |
+     +---------------------+------------------+--------------+
+                            |
+                   +--------v----------+
+                   |    Analyzer       |
+                   | (recurring fails, |
+                   |  JIRA matching)   |
+                   +--------+----------+
+                            |
+                   +--------v----------+
+                   |  HTML Dashboard   |
+                   +-------------------+
 ```
 
 ### Usage
@@ -126,7 +128,7 @@ Options:
 | [Release Controller](https://amd64.ocp.releases.ci.openshift.org) | `/api/v1/releasestream/*/tags` | None | Payload status, blocking/informing job results |
 | [Sippy](https://sippy.dptools.openshift.org) | `/api/jobs` | None | Job pass rates, regressions |
 | [Sippy Component Readiness](https://sippy.dptools.openshift.org/sippy-ng/component_readiness/main) | `/api/component_readiness` | None | HA vs Single Node topology regression detection |
-| [Prow](https://prow.ci.openshift.org) | Job API + GCS artifacts | None | Job logs, junit XMLs, failing test details |
+| [Prow](https://prow.ci.openshift.org) | GCS artifacts via `gsutil` | Google Cloud SDK | Job logs, junit XMLs, failing test details |
 | [JIRA](https://redhat.atlassian.net) | REST API v3 | Token (read-only) | Existing bug search, bug creation links |
 
 ## Topology Job Patterns
@@ -134,8 +136,10 @@ Options:
 Jobs are classified by topology based on name patterns:
 
 - **SNO** (Single Node OpenShift): `sno`, `single-node`, `metal-single-node`
-- **TNA** (Two Node Active): `two-node`, `tna`
-- **TNF** (Two Nodes with Fencing): `tnf`, `two-node-fencing`
+- **TNA** (Two Node with Arbiter): `tna`, `arbiter`
+- **TNF** (Two Node Fencing): `tnf`, `fencing`
+
+Jobs containing `telco` in the name are excluded from all topologies to avoid false matches.
 
 These patterns are defined in `payload_monitor/config.py`.
 
@@ -151,20 +155,6 @@ The generated HTML report is a single self-contained file (no external dependenc
 - **Component Readiness**: HA vs Single Node topology regressions detected by Fisher's exact test
 - **JIRA integration**: Matching existing bugs and suggested new bugs with pre-filled create links
 
-## How to run the tooling
-
-### Terminal
-
-```bash
-python -m payload_monitor --output reports/daily-$(date +\%Y-\%m-\%d).html
-```
-
-### Claude Code skill
-
-```
-/ee-payload-monitor
-```
-
 ## Development
 
 ```bash
@@ -174,7 +164,3 @@ pip install -r requirements.txt
 # Run with verbose output
 python -m payload_monitor --verbose
 ```
-
-## Future Roadmap
-
-- Slack notifications to `@edge-enablement-payload-manager` with daily report summary

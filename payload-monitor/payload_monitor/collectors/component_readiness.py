@@ -1,7 +1,6 @@
 """Fetch Component Readiness data from Sippy (HA vs Single Node)."""
 
 import logging
-from typing import Optional
 
 import requests
 

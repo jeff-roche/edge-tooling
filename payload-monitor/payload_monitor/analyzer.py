@@ -9,7 +9,6 @@ from .models import (
     JobRun,
     MonitorReport,
     StreamReport,
-    SuggestedBug,
 )
 from .collectors import jira as jira_collector
 from .collectors.jira import has_auth as jira_has_auth

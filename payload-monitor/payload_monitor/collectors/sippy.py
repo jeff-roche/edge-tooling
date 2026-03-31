@@ -11,8 +11,6 @@ logger = logging.getLogger(__name__)
 
 BASE_URL = "https://sippy.dptools.openshift.org"
 JOBS_URL = f"{BASE_URL}/api/jobs"
-TESTS_URL = f"{BASE_URL}/api/tests"
-
 _session = create_session()
 
 
@@ -42,20 +40,6 @@ def fetch_edge_jobs(release: str, config: Config) -> list[dict]:
 
     logger.info(f"  Found {len(edge_jobs)} edge jobs for {release}")
     return edge_jobs
-
-
-def fetch_edge_tests(release: str, config: Config) -> list[dict]:
-    """Fetch tests from Sippy — used for additional regression detection."""
-    logger.debug(f"Fetching Sippy tests for release {release}")
-
-    try:
-        resp = _session.get(TESTS_URL, params={"release": release}, timeout=60)
-        resp.raise_for_status()
-        data = resp.json()
-        return data if isinstance(data, list) else []
-    except requests.RequestException as e:
-        logger.error(f"Failed to fetch Sippy tests for {release}: {e}")
-        return []
 
 
 def identify_regressions(
