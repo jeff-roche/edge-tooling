@@ -202,7 +202,7 @@ This file has served its purpose — the analysis is now embedded in the HTML re
 Do NOT duplicate the report data or findings summary — the HTML dashboard already contains all of that. Present only a brief confirmation:
 
 ```
-## Edge Payload Monitor Report Generated
+## Edge Enablement Payload Monitor Report Generated
 
 Report: `payload-monitor/reports/report-{date}.html`
 

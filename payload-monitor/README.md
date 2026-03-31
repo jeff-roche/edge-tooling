@@ -33,7 +33,7 @@ python -m payload_monitor --merge-analysis reports/analysis-2026-03-25.json --ou
 
 ## Architecture
 
-```
+```text
                     +-------------------+
                     |   CLI / Skill     |
                     +--------+----------+
@@ -105,7 +105,7 @@ Or add it to `~/.bashrc` / `~/.zshrc` for persistence.
 
 ## CLI Reference
 
-```
+```text
 Usage: python -m payload_monitor [OPTIONS]
 
 Options:

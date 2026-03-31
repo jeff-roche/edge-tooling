@@ -127,14 +127,14 @@ def generate_html(report: MonitorReport, output_path: Path | None = None) -> str
     context["css"] = css
     context["js"] = js
 
-    html = template.render(**context)
+    rendered_html = template.render(**context)
 
     if output_path:
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(html)
+        output_path.write_text(rendered_html)
         logger.info(f"Report written to {output_path}")
 
-    return html
+    return rendered_html
 
 
 def generate_json(report: MonitorReport, output_path: Path) -> None:
@@ -187,7 +187,7 @@ def generate_json(report: MonitorReport, output_path: Path) -> None:
 
 
 def _safe_urls(urls: list[str]) -> list[str]:
-    """Filter URLs to only allow http/https schemes."""
+    """Filter URLs to only allow the https scheme."""
     safe = []
     for url in urls:
         parsed = urlparse(url)
@@ -203,15 +203,15 @@ def _render_analysis_card(da: dict) -> str:
         '<div class="deep-analysis-card">',
         '  <h3>AI Root Cause Analysis</h3>',
         '  <div class="da-field">',
-        f'    <span class="da-label">Root Cause:</span>',
+        '    <span class="da-label">Root Cause:</span>',
         f'    <span>{e(da.get("root_cause", ""))}</span>',
         '  </div>',
         '  <div class="da-field">',
-        f'    <span class="da-label">Failure Type:</span>',
+        '    <span class="da-label">Failure Type:</span>',
         f'    <span class="badge da-type">{e(da.get("failure_type", ""))}</span>',
         '  </div>',
         '  <div class="da-field">',
-        f'    <span class="da-label">Impact:</span>',
+        '    <span class="da-label">Impact:</span>',
         f'    <span>{e(da.get("impact", ""))}</span>',
         '  </div>',
     ]
@@ -226,7 +226,7 @@ def _render_analysis_card(da: dict) -> str:
         parts.append('  </div>')
     parts.extend([
         '  <div class="da-field">',
-        f'    <span class="da-label">Recommendation:</span>',
+        '    <span class="da-label">Recommendation:</span>',
         f'    <span>{e(da.get("recommendation", ""))}</span>',
         '  </div>',
         '</div>',
