@@ -19,6 +19,7 @@ Edge Tooling is a multi-tool deployment and development toolkit for OpenShift an
 - EC2 dev host → EC2 Deploy (often used as hypervisor for Two-Node Toolbox)
 - Single-node OpenShift → SNO Deploy
 - LVM Operator development → LVM Operator Environment
+- Monitor nightly payload health for edge topologies → Use Payload Monitor
 
 For commands, flags, prerequisites, and workflows: read the component's README.md or Makefile.
 

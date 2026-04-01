@@ -68,7 +68,7 @@ def _collect_blocking_jobs(report: MonitorReport) -> list[dict]:
 @click.option("--skip-prow", is_flag=True, default=False,
               help="Skip Prow artifact fetching (faster, less detail)")
 @click.option("--skip-sippy", is_flag=True, default=False,
-              help="Skip Sippy regression check")
+              help="Skip Sippy regression and Component Readiness checks")
 @click.option("--merge-analysis", "merge_analysis_path", type=click.Path(exists=True), default=None,
               help="Merge analysis JSON into an existing HTML report (or into --from-json data)")
 def main(

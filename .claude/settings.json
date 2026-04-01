@@ -1,15 +1,4 @@
 {
-  "permissions": {
-    "allow": [
-      "Bash(cd payload-monitor *)",
-      "Bash(python3 -m venv *)",
-      "Bash(payload-monitor/.venv/bin/pip install *)",
-      "Bash(payload-monitor/.venv/bin/python *)",
-      "Bash(gsutil cat *)",
-      "Bash(gsutil ls *)",
-      "Bash(gcloud storage ls *)"
-    ]
-  },
   "hooks": {
     "SessionStart": [
       {

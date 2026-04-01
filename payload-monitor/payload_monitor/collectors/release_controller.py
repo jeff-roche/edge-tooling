@@ -156,8 +156,13 @@ def _collect_stream(stream: str, config: Config) -> StreamReport:
             for tag_data in tags
         }
         for future in as_completed(futures):
-            payload = future.result()
-            payloads.append(payload)
+            tag_data = futures[future]
+            try:
+                payload = future.result()
+                payloads.append(payload)
+            except Exception as e:
+                logger.error(f"Failed to fetch payload {tag_data.get('name', '?')}: {e}")
+                continue
 
     # Restore chronological order (tags are newest-first from the API)
     tag_order = {t["name"]: i for i, t in enumerate(tags)}
@@ -180,7 +185,7 @@ def collect(config: Config, streams: list[str] | None = None) -> list[StreamRepo
     if streams is None:
         streams = discover_streams(config)
 
-    with ThreadPoolExecutor(max_workers=len(streams) or 1) as pool:
+    with ThreadPoolExecutor(max_workers=min(len(streams) or 1, 10)) as pool:
         futures = {
             pool.submit(_collect_stream, stream, config): stream
             for stream in streams
@@ -188,7 +193,12 @@ def collect(config: Config, streams: list[str] | None = None) -> list[StreamRepo
         reports = {}
         for future in as_completed(futures):
             stream = futures[future]
-            reports[stream] = future.result()
+            try:
+                reports[stream] = future.result()
+            except Exception as e:
+                logger.error(f"Failed to collect stream {stream}: {e}")
+                version = stream.split(".0-0.nightly")[0]
+                reports[stream] = StreamReport(stream=stream, version=version, payloads=[])
 
     # Preserve original stream order
     return [reports[s] for s in streams]

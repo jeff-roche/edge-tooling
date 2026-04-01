@@ -1,6 +1,7 @@
 """Fetch Component Readiness data from Sippy (HA vs Single Node)."""
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 
@@ -118,7 +119,16 @@ def collect(versions: list[str]) -> list[ComponentRegression]:
     Only versions with a Sippy ha-vs-single view will return data.
     """
     all_regressions = []
-    for version in versions:
-        regressions = fetch_component_regressions(version)
-        all_regressions.extend(regressions)
+    with ThreadPoolExecutor(max_workers=min(len(versions) or 1, 10)) as pool:
+        futures = {
+            pool.submit(fetch_component_regressions, version): version
+            for version in versions
+        }
+        for future in as_completed(futures):
+            version = futures[future]
+            try:
+                all_regressions.extend(future.result())
+            except Exception as e:
+                logger.error(f"Failed to fetch component readiness for {version}: {e}")
+                continue
     return all_regressions

@@ -136,4 +136,9 @@ def enrich_failing_jobs(jobs: list[JobRun], max_workers: int = 4) -> None:
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = {pool.submit(enrich_job, job): job for job in failing}
         for future in as_completed(futures):
-            future.result()
+            job = futures[future]
+            try:
+                future.result()
+            except Exception as e:
+                logger.error(f"Failed to enrich job {job.name}: {e}")
+                continue
