@@ -164,3 +164,21 @@ pip install -r requirements.txt
 # Run with verbose output
 python -m payload_monitor --verbose
 ```
+
+### Running Tests
+
+Tests use [pytest](https://docs.pytest.org/) and live in the `tests/` directory. All external HTTP calls are mocked, so no network access or credentials are needed.
+
+```bash
+# Install test dependencies
+pip install pytest
+
+# Run all tests
+python -m pytest tests/
+
+# Run with verbose output
+python -m pytest tests/ -v
+
+# Run a specific test file
+python -m pytest tests/test_models.py
+```
