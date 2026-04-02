@@ -20,7 +20,10 @@ NAME="World"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        -n|--name) NAME="$2"; shift 2 ;;
+        -n|--name)
+            [[ $# -ge 2 ]] || { echo "${RED}Error:${NC} --name requires a value" >&2; exit 1; }
+            NAME="$2"; shift 2
+            ;;
         -h|--help) usage; exit 0 ;;
         -*) echo "${RED}Error:${NC} Unknown option: $1" >&2; exit 1 ;;
         *) NAME="$1"; shift ;;

@@ -120,7 +120,7 @@ Within skill instructions, you can reference these runtime variables:
 Example usage in a skill body:
 
 ```bash
-!`bash $PLUGIN_DIR/command.sh --name $ARGUMENTS`
+!`bash "${PLUGIN_DIR}/command.sh" --name "${ARGUMENTS}"`
 ```
 
 ### Hooks (hooks.json)

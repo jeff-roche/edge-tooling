@@ -430,7 +430,9 @@ create_plugin() {
 import sys
 tmpl, dst, name, desc = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 content = open(tmpl, encoding='utf-8').read()
-for placeholder, value in [('{{PLUGIN_NAME}}', name), ('{{DESCRIPTION}}', desc)]:
+# Escape backslashes and double quotes so the description is valid inside YAML double-quoted strings
+yaml_desc = desc.replace('\\', '\\\\').replace('"', '\\"')
+for placeholder, value in [('{{PLUGIN_NAME}}', name), ('{{DESCRIPTION}}', yaml_desc)]:
     content = content.replace(placeholder, value)
 open(dst, 'w', encoding='utf-8').write(content)
 PYEOF
@@ -443,7 +445,7 @@ PYEOF
     fi
 
     if [[ "$has_mcp" == "true" ]]; then
-        cp "${TEMPLATES_DIR}/mcp.json.template" "${plugin_dir}/.mcp.json"
+        _scaffold_from_template "${TEMPLATES_DIR}/mcp.json.template" "${plugin_dir}/.mcp.json" "$plugin_name" ""
     fi
 
     if [[ "$has_agent" == "true" ]]; then

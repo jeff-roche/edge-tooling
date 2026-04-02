@@ -1,6 +1,6 @@
 ---
 name: {{PLUGIN_NAME}}
-description: {{DESCRIPTION}}
+description: "{{DESCRIPTION}}"
 user-invocable: true
 ---
 

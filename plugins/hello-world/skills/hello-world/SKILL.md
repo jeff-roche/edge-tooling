@@ -13,11 +13,11 @@ Greets the user with a colorful terminal message.
 Run the hello-world command:
 
 ```bash
-!`bash $PLUGIN_DIR/command.sh`
+!`bash "${PLUGIN_DIR}/command.sh"`
 ```
 
 With a custom name:
 
 ```bash
-!`bash $PLUGIN_DIR/command.sh --name $ARGUMENTS`
+!`bash "${PLUGIN_DIR}/command.sh" --name "${ARGUMENTS}"`
 ```
