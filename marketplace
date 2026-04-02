@@ -286,8 +286,8 @@ validate_plugin() {
             # Validate version format (semver)
             local version
             version=$(json_get "$plugin_json" ".version")
-            if [[ -n "$version" && ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                warn "Invalid version format: $version (expected semver: X.Y.Z)"
+            if [[ -n "$version" && ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?$ ]]; then
+                warn "Invalid version format: $version (expected semver: X.Y.Z[-prerelease][+build])"
                 ((errors++)) || true
             fi
 
