@@ -13,13 +13,16 @@ Edge Tooling is a multi-tool deployment and development toolkit for OpenShift an
 | SNO Deploy | `sno-deploy/` | Single Node OpenShift with DU configuration |
 | Payload Monitor | `payload-monitor/` | Nightly payload health monitoring for edge topologies (SNO/TNA/TNF) |
 | LVM Operator Environment | `environments/lvm-operator/` | Development workspace template for LVMS |
+| Plugin Marketplace | `plugins/` | Claude Code plugin marketplace for OpenShift/edge workflows |
 
 **Use case routing:**
+
 - Two-node HA cluster → Two-Node Toolbox
 - EC2 dev host → EC2 Deploy (often used as hypervisor for Two-Node Toolbox)
 - Single-node OpenShift → SNO Deploy
 - LVM Operator development → LVM Operator Environment
 - Monitor nightly payload health for edge topologies → Use Payload Monitor
+- Claude Code plugins for OpenShift/edge → Plugin Marketplace (`/plugin marketplace add openshift-eng/edge-tooling`)
 
 For commands, flags, prerequisites, and workflows: read the component's README.md or Makefile.
 
@@ -68,6 +71,7 @@ A Claude Code hook checks whether git submodules (e.g., `two-node-toolbox/`) are
 **Hook location:** `.claude/hooks/update-submodules.sh`
 
 **Behavior:**
+
 1. Silently initializes any uninitialized submodules
 2. Fetches from each submodule's remote and compares the pinned commit to the remote branch tip
 3. If any submodules are behind, Claude reports the details and asks if you'd like to update
@@ -102,6 +106,7 @@ DOCUMENTED_TOOLS=(
 ## Additional Resources
 
 For detailed component-specific guidance, see:
+
 - `two-node-toolbox/CLAUDE.md` - Full development guidelines, coding standards, architecture details
 - `environments/lvm-operator/CLAUDE.md` - LVM Operator workspace navigation, Konflux build chain
 - Component README files in each directory

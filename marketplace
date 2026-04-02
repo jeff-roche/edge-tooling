@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
 # Plugin Marketplace CLI
-# Manage Claude Code plugins for OpenShift and edge workflows
+# Developer tool for scaffolding, validating, and cataloging
+# Claude Code plugins for OpenShift and edge workflows
 #
 
 set -euo pipefail
@@ -9,21 +10,29 @@ set -euo pipefail
 # Constants
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGINS_DIR="${SCRIPT_DIR}/plugins"
-REGISTRY_DIR="${PLUGINS_DIR}/.registry"
-CATALOG_FILE="${REGISTRY_DIR}/catalog.yml"
-STATE_FILE="${REGISTRY_DIR}/state.yml"
-SCHEMA_FILE="${REGISTRY_DIR}/schema.yml"
+MARKETPLACE_FILE="${SCRIPT_DIR}/.claude-plugin/marketplace.json"
 TEMPLATES_DIR="${PLUGINS_DIR}/.templates"
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-MAGENTA='\033[0;35m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
-BOLD='\033[1m'
+# Colors for output (disable when stdout is not a terminal)
+RED=''
+GREEN=''
+YELLOW=''
+BLUE=''
+MAGENTA=''
+CYAN=''
+NC=''
+BOLD=''
+
+if [[ -t 1 ]]; then
+    RED=$'\033[0;31m'
+    GREEN=$'\033[0;32m'
+    YELLOW=$'\033[1;33m'
+    BLUE=$'\033[0;34m'
+    MAGENTA=$'\033[0;35m'
+    CYAN=$'\033[0;36m'
+    NC=$'\033[0m'
+    BOLD=$'\033[1m'
+fi
 
 # Helper functions
 error() {
@@ -45,7 +54,7 @@ success() {
 
 # Check dependencies
 check_dependencies() {
-    local deps=("yq" "git" "python3")
+    local deps=("jq" "git" "python3")
     local missing=()
 
     for dep in "${deps[@]}"; do
@@ -55,118 +64,121 @@ check_dependencies() {
     done
 
     if [ ${#missing[@]} -gt 0 ]; then
-        error "Missing required dependencies: ${missing[*]}\nInstall with: dnf install yq git python3"
+        error "Missing required dependencies: ${missing[*]}\nInstall with: dnf install jq git python3"
     fi
 }
 
-# Parse YAML using yq
-yaml_get() {
+# Read a field from a plugin.json file
+json_get() {
     local file="$1"
     local query="$2"
-    yq eval "$query" "$file" 2>/dev/null || echo ""
+    jq -r "$query // empty" "$file" 2>/dev/null || echo ""
 }
 
-# Check if a plugin is installed
-is_installed() {
-    local name="$1"
-    local check
-    check=$(yq eval ".installed_plugins[] | select(.name == \"$name\") | .name" "$STATE_FILE" 2>/dev/null)
-    [[ -n "$check" && "$check" != "null" ]]
-}
-
-# Update catalog from plugins directory
+# Update catalog: scan plugins and generate .claude-plugin/marketplace.json
 update_catalog() {
     info "Scanning plugins directory..."
 
+    mkdir -p "$(dirname "$MARKETPLACE_FILE")"
+
     local plugin_count=0
+    local plugins_json="[]"
 
-    # Write initial catalog structure
-    cat > "$CATALOG_FILE" <<EOF
-# Plugin Marketplace Catalog
-# Auto-generated - do not edit manually
-# Last updated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-version: "1.0"
-plugins: []
-EOF
-
-    # Find all plugin directories (contain plugin.yml)
+    # Find all plugin directories (contain .claude-plugin/plugin.json)
     while IFS= read -r -d '' plugin_file; do
-        local plugin_dir=$(dirname "$plugin_file")
-        local plugin_name=$(basename "$plugin_dir")
+        local plugin_dir
+        plugin_dir=$(dirname "$(dirname "$plugin_file")")
+        local plugin_name
+        plugin_name=$(basename "$plugin_dir")
 
-        # Skip template and registry directories
-        [[ "$plugin_name" == ".templates" || "$plugin_name" == ".registry" || "$plugin_name" == "docs" ]] && continue
+        # Skip template and docs directories
+        [[ "$plugin_name" == ".templates" || "$plugin_name" == "docs" ]] && continue
 
-        # Extract metadata
-        local name=$(yaml_get "$plugin_file" ".name")
-        local version=$(yaml_get "$plugin_file" ".version")
-        local type=$(yaml_get "$plugin_file" ".type")
-        local category=$(yaml_get "$plugin_file" ".category")
-        local description=$(yaml_get "$plugin_file" ".description")
-        local author=$(yaml_get "$plugin_file" ".author")
-
-        # Validate required fields
-        if [[ -z "$name" || -z "$version" || -z "$type" || -z "$category" ]]; then
-            warn "Skipping $plugin_name: missing required metadata fields"
+        # Validate it has required fields
+        local name
+        name=$(json_get "$plugin_file" ".name")
+        if [[ -z "$name" ]]; then
+            warn "Skipping $plugin_name: missing name in plugin.json"
             continue
         fi
 
-        # Add to catalog using yq with env vars for safe YAML generation
-        NAME="$name" VERSION="$version" TYPE="$type" CATEGORY="$category" \
-            DESCRIPTION="$description" AUTHOR="$author" PLUGIN_PATH="$plugin_name" \
-            yq eval -i '.plugins += [{"name": env(NAME), "version": env(VERSION), "type": env(TYPE), "category": env(CATEGORY), "description": env(DESCRIPTION), "author": env(AUTHOR), "path": env(PLUGIN_PATH)}]' "$CATALOG_FILE"
+        # Compute relative path from repo root
+        local rel_path="plugins/${plugin_name}"
+
+        plugins_json=$(echo "$plugins_json" | jq \
+            --arg name "$name" \
+            --arg path "$rel_path" \
+            '. += [{"name": $name, "path": $path}]')
 
         ((plugin_count++)) || true
-    done < <(find "$PLUGINS_DIR" -maxdepth 2 -name "plugin.yml" -print0)
+    done < <(find "$PLUGINS_DIR" -maxdepth 3 -path '*/.claude-plugin/plugin.json' -print0)
 
-    success "Catalog updated: $plugin_count plugins found"
+    # Write marketplace.json
+    jq -n \
+        --arg name "edge-tooling" \
+        --arg desc "Claude Code plugins for OpenShift and edge computing workflows" \
+        --argjson plugins "$plugins_json" \
+        '{"name": $name, "description": $desc, "plugins": $plugins}' \
+        > "$MARKETPLACE_FILE"
+
+    success "Catalog updated: $plugin_count plugin(s) found"
 }
 
 # List all available plugins
 list_plugins() {
-    local filter="$1"
+    local filter="${1:-}"
 
-    # Update catalog first
-    update_catalog
+    # Ensure marketplace.json exists
+    if [[ ! -f "$MARKETPLACE_FILE" ]]; then
+        update_catalog
+    fi
 
     echo -e "${BOLD}Available Plugins:${NC}\n"
 
     local count=0
+    local plugin_names
+    plugin_names=$(jq -r '.plugins[].name' "$MARKETPLACE_FILE")
+
     while IFS= read -r name; do
         [[ -z "$name" ]] && continue
 
-        local version=$(yq eval ".plugins[] | select(.name == \"$name\") | .version" "$CATALOG_FILE")
-        local type=$(yq eval ".plugins[] | select(.name == \"$name\") | .type" "$CATALOG_FILE")
-        local category=$(yq eval ".plugins[] | select(.name == \"$name\") | .category" "$CATALOG_FILE")
-        local description=$(yq eval ".plugins[] | select(.name == \"$name\") | .description" "$CATALOG_FILE")
-        local author=$(yq eval ".plugins[] | select(.name == \"$name\") | .author" "$CATALOG_FILE")
+        local plugin_path
+        plugin_path=$(jq -r --arg n "$name" '.plugins[] | select(.name == $n) | .path' "$MARKETPLACE_FILE")
+        local plugin_json="${SCRIPT_DIR}/${plugin_path}/.claude-plugin/plugin.json"
+
+        if [[ ! -f "$plugin_json" ]]; then
+            warn "Plugin metadata not found for $name"
+            continue
+        fi
+
+        local version description author
+        version=$(json_get "$plugin_json" ".version")
+        description=$(json_get "$plugin_json" ".description")
+        author=$(json_get "$plugin_json" ".author.name")
 
         # Apply filter if provided
         if [[ -n "$filter" ]]; then
-            if [[ ! "$name" =~ $filter && ! "$category" =~ $filter && ! "$description" =~ $filter ]]; then
+            if [[ ! "$name" =~ $filter && ! "${description:-}" =~ $filter ]]; then
                 continue
             fi
         fi
 
-        # Check if installed
-        local installed=""
-        if is_installed "$name"; then
-            installed=" ${GREEN}[installed]${NC}"
-        fi
-
-        echo -e "${CYAN}${name}${NC} ${MAGENTA}(v${version})${NC}${installed}"
-        echo -e "  ${BOLD}Type:${NC} $type | ${BOLD}Category:${NC} $category | ${BOLD}Author:${NC} $author"
+        echo -e "${CYAN}${name}${NC} ${MAGENTA}(v${version})${NC}"
+        echo -e "  ${BOLD}Author:${NC} $author"
         echo -e "  $description"
         echo ""
 
         ((count++)) || true
-    done < <(yq eval '.plugins[].name' "$CATALOG_FILE")
+    done <<< "$plugin_names"
 
     if [ $count -eq 0 ]; then
-        warn "No plugins found matching filter: $filter"
+        if [[ -n "$filter" ]]; then
+            warn "No plugins found matching filter: $filter"
+        else
+            info "No plugins found. Run 'marketplace catalog-update' to scan."
+        fi
     else
-        echo -e "${BOLD}Total:${NC} $count plugins"
+        echo -e "${BOLD}Total:${NC} $count plugin(s)"
     fi
 }
 
@@ -174,360 +186,136 @@ list_plugins() {
 show_plugin() {
     local plugin_name="$1"
 
-    local plugin_path=$(yq eval ".plugins[] | select(.name == \"$plugin_name\") | .path" "$CATALOG_FILE")
+    if [[ ! -f "$MARKETPLACE_FILE" ]]; then
+        update_catalog
+    fi
+
+    local plugin_path
+    plugin_path=$(jq -r --arg n "$plugin_name" '.plugins[] | select(.name == $n) | .path' "$MARKETPLACE_FILE")
     if [[ -z "$plugin_path" || "$plugin_path" == "null" ]]; then
         error "Plugin not found: $plugin_name"
     fi
 
-    local plugin_file="${PLUGINS_DIR}/${plugin_path}/plugin.yml"
-    if [[ ! -f "$plugin_file" ]]; then
-        error "Plugin metadata not found: $plugin_file"
+    local plugin_json="${SCRIPT_DIR}/${plugin_path}/.claude-plugin/plugin.json"
+    if [[ ! -f "$plugin_json" ]]; then
+        error "Plugin metadata not found: $plugin_json"
     fi
 
     echo -e "${BOLD}Plugin Details: ${CYAN}${plugin_name}${NC}\n"
 
-    # Basic info
-    local version=$(yaml_get "$plugin_file" ".version")
-    local type=$(yaml_get "$plugin_file" ".type")
-    local category=$(yaml_get "$plugin_file" ".category")
-    local author=$(yaml_get "$plugin_file" ".author")
-    local description=$(yaml_get "$plugin_file" ".description")
-    local long_desc=$(yaml_get "$plugin_file" ".long_description")
+    local version description author homepage license
+    version=$(json_get "$plugin_json" ".version")
+    description=$(json_get "$plugin_json" ".description")
+    author=$(json_get "$plugin_json" ".author.name")
+    homepage=$(json_get "$plugin_json" ".homepage")
+    license=$(json_get "$plugin_json" ".license")
 
     echo -e "${BOLD}Version:${NC} $version"
-    echo -e "${BOLD}Type:${NC} $type"
-    echo -e "${BOLD}Category:${NC} $category"
     echo -e "${BOLD}Author:${NC} $author"
     echo -e "${BOLD}Description:${NC} $description"
+    [[ -n "$homepage" ]] && echo -e "${BOLD}Homepage:${NC} $homepage"
+    [[ -n "$license" ]] && echo -e "${BOLD}License:${NC} $license"
 
-    if [[ -n "$long_desc" && "$long_desc" != "null" ]]; then
-        echo -e "\n${BOLD}Details:${NC}\n$long_desc"
-    fi
+    # Show components
+    local plugin_dir="${SCRIPT_DIR}/${plugin_path}"
+    echo -e "\n${BOLD}Components:${NC}"
+    [[ -d "${plugin_dir}/skills" ]] && echo "  - Skills"
+    [[ -d "${plugin_dir}/hooks" ]] && echo "  - Hooks"
+    [[ -f "${plugin_dir}/.mcp.json" ]] && echo "  - MCP Server"
+    [[ -d "${plugin_dir}/agents" ]] && echo "  - Agents"
 
-    # Compatibility
-    echo -e "\n${BOLD}Compatibility:${NC}"
-    local min_version=$(yaml_get "$plugin_file" ".compatibility.claude_code_min")
-    [[ -n "$min_version" && "$min_version" != "null" ]] && echo "  Claude Code: >= $min_version"
-
-    local ocp_versions=$(yaml_get "$plugin_file" ".compatibility.openshift_versions[]")
-    [[ -n "$ocp_versions" && "$ocp_versions" != "null" ]] && echo "  OpenShift: $ocp_versions"
-
-    local required_tools=$(yaml_get "$plugin_file" ".compatibility.required_tools[]")
-    [[ -n "$required_tools" && "$required_tools" != "null" ]] && echo "  Required tools: $required_tools"
-
-    # Dependencies
-    local deps=$(yaml_get "$plugin_file" ".dependencies.plugins[]")
-    if [[ -n "$deps" && "$deps" != "null" ]]; then
-        echo -e "\n${BOLD}Dependencies:${NC}"
-        echo "  $deps"
-    fi
-
-    # Usage examples
-    local examples=$(yaml_get "$plugin_file" ".usage.examples[]")
-    if [[ -n "$examples" && "$examples" != "null" ]]; then
-        echo -e "\n${BOLD}Examples:${NC}"
-        while IFS= read -r example; do
-            echo "  - $example"
-        done <<< "$examples"
-    fi
-
-    # Installation status
-    echo -e "\n${BOLD}Status:${NC}"
-    if is_installed "$plugin_name"; then
-        local install_date=$(yq eval ".installed_plugins[] | select(.name == \"$plugin_name\") | .install_date" "$STATE_FILE")
-        echo -e "  ${GREEN}Installed${NC} (on $install_date)"
-    else
-        echo "  Not installed"
-    fi
-
-    # Show README if available
-    local readme="${PLUGINS_DIR}/${plugin_path}/README.md"
-    if [[ -f "$readme" ]]; then
+    # Show README path if available
+    if [[ -f "${plugin_dir}/README.md" ]]; then
         echo -e "\n${BOLD}Documentation:${NC}"
-        echo "  See: plugins/${plugin_path}/README.md"
+        echo "  See: ${plugin_path}/README.md"
     fi
 }
 
-# Install a plugin
-install_plugin() {
-    local plugin_name="$1"
-    local force="${2:-false}"
-
-    info "Installing plugin: $plugin_name"
-
-    # Check if already installed
-    if is_installed "$plugin_name"; then
-        if [[ "$force" != "true" ]]; then
-            warn "Plugin already installed. Use --force to reinstall."
-            return 0
-        fi
-        info "Reinstalling plugin..."
-    fi
-
-    # Get plugin path
-    local plugin_path=$(yq eval ".plugins[] | select(.name == \"$plugin_name\") | .path" "$CATALOG_FILE")
-    if [[ -z "$plugin_path" || "$plugin_path" == "null" ]]; then
-        error "Plugin not found in catalog: $plugin_name"
-    fi
-
-    local plugin_file="${PLUGINS_DIR}/${plugin_path}/plugin.yml"
-    if [[ ! -f "$plugin_file" ]]; then
-        error "Plugin metadata not found: $plugin_file"
-    fi
-
-    # Validate plugin
-    validate_plugin "$plugin_name"
-
-    # Check dependencies
-    local deps=$(yaml_get "$plugin_file" ".dependencies.plugins[]")
-    if [[ -n "$deps" && "$deps" != "null" ]]; then
-        info "Checking dependencies..."
-        while IFS= read -r dep; do
-            if ! is_installed "$dep"; then
-                warn "Missing dependency: $dep"
-                read -p "Install dependency $dep? (y/n) " -n 1 -r
-                echo
-                if [[ $REPLY =~ ^[Yy]$ ]]; then
-                    install_plugin "$dep"
-                else
-                    error "Cannot install $plugin_name without dependency $dep"
-                fi
-            fi
-        done <<< "$deps"
-    fi
-
-    # Determine Claude Code config directory
-    local claude_dir="${HOME}/.claude"
-    if [[ ! -d "$claude_dir" ]]; then
-        warn "Claude Code config directory not found: $claude_dir"
-        read -p "Create it? (y/n) " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            mkdir -p "$claude_dir"
-        else
-            error "Installation cancelled"
-        fi
-    fi
-
-    # Install files based on plugin type
-    local type=$(yaml_get "$plugin_file" ".type")
-    local version=$(yaml_get "$plugin_file" ".version")
-
-    case "$type" in
-        skill)
-            info "Installing skill files..."
-            local skills_dir="${claude_dir}/skills"
-            mkdir -p "$skills_dir"
-
-            local skills=$(yaml_get "$plugin_file" ".install.skills[]")
-            if [[ -n "$skills" && "$skills" != "null" ]]; then
-                while IFS= read -r skill_file; do
-                    local src="${PLUGINS_DIR}/${plugin_path}/${skill_file}"
-                    local dst="${skills_dir}/${plugin_name}-$(basename "$skill_file")"
-                    if [[ -f "$src" ]]; then
-                        cp "$src" "$dst"
-                        info "  Installed: $dst"
-                    else
-                        warn "  Skill file not found: $src"
-                    fi
-                done <<< "$skills"
-            fi
-            ;;
-        command)
-            info "Installing command files..."
-            local commands_dir="${claude_dir}/commands"
-            mkdir -p "$commands_dir"
-
-            local commands=$(yaml_get "$plugin_file" ".install.commands[]")
-            if [[ -n "$commands" && "$commands" != "null" ]]; then
-                while IFS= read -r cmd_file; do
-                    local src="${PLUGINS_DIR}/${plugin_path}/${cmd_file}"
-                    local dst="${commands_dir}/$(basename "$cmd_file")"
-                    if [[ -f "$src" ]]; then
-                        cp "$src" "$dst"
-                        chmod +x "$dst"
-                        info "  Installed: $dst"
-                    else
-                        warn "  Command file not found: $src"
-                    fi
-                done <<< "$commands"
-            fi
-            ;;
-        subagent)
-            info "Installing agent files..."
-            local agents_dir="${claude_dir}/agents"
-            mkdir -p "$agents_dir"
-
-            local agents
-            agents=$(yaml_get "$plugin_file" ".install.agents[]")
-            if [[ -n "$agents" && "$agents" != "null" ]]; then
-                while IFS= read -r agent_file; do
-                    local src="${PLUGINS_DIR}/${plugin_path}/${agent_file}"
-                    local dst="${agents_dir}/${plugin_name}-$(basename "$agent_file")"
-                    if [[ -f "$src" ]]; then
-                        cp "$src" "$dst"
-                        info "  Installed: $dst"
-                    else
-                        warn "  Agent file not found: $src"
-                    fi
-                done <<< "$agents"
-            else
-                warn "No agent files specified in install.agents for plugin $plugin_name"
-            fi
-            ;;
-        hybrid)
-            warn "hybrid plugin type: install steps are implementation-defined. Check plugin.yml for manual instructions."
-            ;;
-        *)
-            warn "Plugin type '$type' installation not fully implemented yet"
-            ;;
-    esac
-
-    # Warn about install keys that are declared but not processed
-    local has_files has_hooks
-    has_files=$(yaml_get "$plugin_file" ".install.files | length")
-    has_hooks=$(yaml_get "$plugin_file" ".install.hooks | length")
-    if [[ "${has_files:-0}" -gt 0 ]] 2>/dev/null; then
-        warn "install.files declared in plugin.yml but not processed — manual installation required"
-    fi
-    if [[ "${has_hooks:-0}" -gt 0 ]] 2>/dev/null; then
-        warn "install.hooks declared in plugin.yml but not processed — manual hook registration required"
-    fi
-
-    # Run post-install script if present
-    local post_install=$(yaml_get "$plugin_file" ".install.post_install")
-    if [[ -n "$post_install" && "$post_install" != "null" ]]; then
-        local post_script="${PLUGINS_DIR}/${plugin_path}/${post_install}"
-        if [[ -f "$post_script" ]]; then
-            info "Running post-install script..."
-            bash "$post_script" || warn "Post-install script failed"
-        fi
-    fi
-
-    # Update state file
-    local install_date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-    # Remove existing entry if reinstalling
-    yq eval -i "del(.installed_plugins[] | select(.name == \"$plugin_name\"))" "$STATE_FILE"
-
-    # Add new entry
-    yq eval -i ".installed_plugins += [{\"name\": \"$plugin_name\", \"version\": \"$version\", \"install_date\": \"$install_date\", \"status\": \"active\"}]" "$STATE_FILE"
-
-    success "Plugin installed: $plugin_name"
-
-    # Show usage info
-    local examples=$(yaml_get "$plugin_file" ".usage.examples[]")
-    if [[ -n "$examples" && "$examples" != "null" ]]; then
-        echo -e "\n${BOLD}Usage Examples:${NC}"
-        while IFS= read -r example; do
-            echo "  - $example"
-        done <<< "$examples"
-    fi
-}
-
-# Uninstall a plugin
-uninstall_plugin() {
-    local plugin_name="$1"
-
-    info "Uninstalling plugin: $plugin_name"
-
-    # Check if installed
-    if ! is_installed "$plugin_name"; then
-        warn "Plugin not installed: $plugin_name"
-        return 0
-    fi
-
-    # Get plugin info
-    local plugin_path=$(yq eval ".plugins[] | select(.name == \"$plugin_name\") | .path" "$CATALOG_FILE")
-    local plugin_file="${PLUGINS_DIR}/${plugin_path}/plugin.yml"
-
-    # Remove installed files
-    local claude_dir="${HOME}/.claude"
-    local type=$(yaml_get "$plugin_file" ".type")
-
-    case "$type" in
-        skill)
-            local skills_dir="${claude_dir}/skills"
-            find "$skills_dir" -maxdepth 1 -name "${plugin_name}-*" -delete 2>/dev/null || true
-            ;;
-        command)
-            local commands_dir="${claude_dir}/commands"
-            local commands=$(yaml_get "$plugin_file" ".install.commands[]")
-            if [[ -n "$commands" && "$commands" != "null" ]]; then
-                while IFS= read -r cmd_file; do
-                    rm -f "${commands_dir}/$(basename "$cmd_file")"
-                done <<< "$commands"
-            fi
-            ;;
-        subagent)
-            local agents_dir="${claude_dir}/agents"
-            find "$agents_dir" -maxdepth 1 -name "${plugin_name}-*" -delete 2>/dev/null || true
-            ;;
-    esac
-
-    # Update state file
-    yq eval -i "del(.installed_plugins[] | select(.name == \"$plugin_name\"))" "$STATE_FILE"
-
-    success "Plugin uninstalled: $plugin_name"
-}
-
-# Validate plugin metadata
+# Validate plugin structure
 validate_plugin() {
     local plugin_name="$1"
 
-    # Refresh catalog so validation always reflects current plugin state
-    update_catalog
-
-    local plugin_path=$(yq eval ".plugins[] | select(.name == \"$plugin_name\") | .path" "$CATALOG_FILE")
-    if [[ -z "$plugin_path" || "$plugin_path" == "null" ]]; then
-        error "Plugin not found: $plugin_name"
+    # Resolve plugin directory: prefer catalog path for accuracy, fall back to convention
+    local plugin_dir
+    if [[ -f "$MARKETPLACE_FILE" ]]; then
+        local plugin_path
+        plugin_path=$(jq -r --arg n "$plugin_name" '.plugins[] | select(.name == $n) | .path' "$MARKETPLACE_FILE")
+        if [[ -n "$plugin_path" && "$plugin_path" != "null" ]]; then
+            plugin_dir="${SCRIPT_DIR}/${plugin_path}"
+        fi
     fi
-
-    local plugin_file="${PLUGINS_DIR}/${plugin_path}/plugin.yml"
-    local plugin_dir="${PLUGINS_DIR}/${plugin_path}"
+    plugin_dir="${plugin_dir:-${PLUGINS_DIR}/${plugin_name}}"
+    if [[ ! -d "$plugin_dir" ]]; then
+        error "Plugin directory not found: $plugin_dir"
+    fi
 
     info "Validating plugin: $plugin_name"
 
     local errors=0
 
-    # Check required files
-    if [[ ! -f "$plugin_file" ]]; then
-        error "Missing plugin.yml"
+    # Check .claude-plugin/plugin.json exists
+    local plugin_json="${plugin_dir}/.claude-plugin/plugin.json"
+    if [[ ! -f "$plugin_json" ]]; then
+        warn "Missing .claude-plugin/plugin.json"
+        ((errors++)) || true
+    else
+        # Validate JSON is parseable
+        if ! jq empty "$plugin_json" 2>/dev/null; then
+            warn "plugin.json is not valid JSON"
+            ((errors++)) || true
+        else
+            # Validate required fields
+            local required_fields=("name" "description" "version")
+            for field in "${required_fields[@]}"; do
+                local value
+                value=$(json_get "$plugin_json" ".$field")
+                if [[ -z "$value" ]]; then
+                    warn "Missing required field in plugin.json: $field"
+                    ((errors++)) || true
+                fi
+            done
+
+            # Validate author object
+            local author_name
+            author_name=$(json_get "$plugin_json" ".author.name")
+            if [[ -z "$author_name" ]]; then
+                warn "Missing .author.name in plugin.json"
+                ((errors++)) || true
+            fi
+
+            # Validate version format (semver)
+            local version
+            version=$(json_get "$plugin_json" ".version")
+            if [[ -n "$version" && ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                warn "Invalid version format: $version (expected semver: X.Y.Z)"
+                ((errors++)) || true
+            fi
+
+            # Validate plugin name matches directory
+            local json_name
+            json_name=$(json_get "$plugin_json" ".name")
+            if [[ "$json_name" != "$plugin_name" ]]; then
+                warn "Plugin name in plugin.json ($json_name) does not match directory name ($plugin_name)"
+                ((errors++)) || true
+            fi
+        fi
     fi
 
+    # Check README.md exists
     if [[ ! -f "${plugin_dir}/README.md" ]]; then
         warn "Missing README.md"
         ((errors++)) || true
     fi
 
-    # Validate required fields
-    local required_fields=("name" "version" "type" "category" "description" "author")
-    for field in "${required_fields[@]}"; do
-        local value=$(yaml_get "$plugin_file" ".$field")
-        if [[ -z "$value" || "$value" == "null" ]]; then
-            warn "Missing required field: $field"
-            ((errors++)) || true
-        fi
-    done
+    # Check at least one component exists
+    local has_component=false
+    [[ -d "${plugin_dir}/skills" ]] && has_component=true
+    [[ -d "${plugin_dir}/hooks" ]] && has_component=true
+    [[ -f "${plugin_dir}/.mcp.json" ]] && has_component=true
+    [[ -d "${plugin_dir}/agents" ]] && has_component=true
 
-    # Validate type
-    local type=$(yaml_get "$plugin_file" ".type")
-    if [[ ! "$type" =~ ^(skill|command|subagent|hybrid)$ ]]; then
-        warn "Invalid type: $type (must be skill|command|subagent|hybrid)"
-        ((errors++)) || true
-    fi
-
-    # Validate category
-    local category=$(yaml_get "$plugin_file" ".category")
-    if [[ ! "$category" =~ ^(cluster-ops|debug|deploy|network|operator|ci-cd|util)$ ]]; then
-        warn "Invalid category: $category"
-        ((errors++)) || true
-    fi
-
-    # Validate version format (semver)
-    local version=$(yaml_get "$plugin_file" ".version")
-    if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        warn "Invalid version format: $version (expected semver: X.Y.Z)"
+    if [[ "$has_component" == "false" ]]; then
+        warn "No components found (expected at least one of: skills/, hooks/, .mcp.json, agents/)"
         ((errors++)) || true
     fi
 
@@ -535,66 +323,27 @@ validate_plugin() {
         success "Validation passed"
         return 0
     else
-        warn "Validation completed with $errors warnings"
+        warn "Validation completed with $errors warning(s)"
         return 1
     fi
 }
 
-# Show status of installed plugins
-show_status() {
-    echo -e "${BOLD}Installed Plugins:${NC}\n"
-
-    local count=0
-    while IFS= read -r name; do
-        [[ -z "$name" ]] && continue
-
-        local version=$(yq eval ".installed_plugins[] | select(.name == \"$name\") | .version" "$STATE_FILE")
-        local install_date=$(yq eval ".installed_plugins[] | select(.name == \"$name\") | .install_date" "$STATE_FILE")
-        local status=$(yq eval ".installed_plugins[] | select(.name == \"$name\") | .status" "$STATE_FILE")
-
-        # Check if update available
-        local latest_version=$(yq eval ".plugins[] | select(.name == \"$name\") | .version" "$CATALOG_FILE")
-        local update_indicator=""
-        if [[ "$version" != "$latest_version" ]]; then
-            update_indicator=" ${YELLOW}(update available: v${latest_version})${NC}"
-        fi
-
-        echo -e "${CYAN}${name}${NC} ${MAGENTA}(v${version})${NC}${update_indicator}"
-        echo -e "  Installed: $install_date | Status: $status"
-        echo ""
-
-        ((count++)) || true
-    done < <(yq eval '.installed_plugins[].name' "$STATE_FILE")
-
-    if [ $count -eq 0 ]; then
-        info "No plugins installed"
-    else
-        echo -e "${BOLD}Total:${NC} $count plugins installed"
-    fi
-}
-
-# Helper: copy a template file to a destination, substituting known placeholders.
-# Only safe/validated values (name, category, type, date) are substituted here.
-# Usage: _scaffold_from_template <src> <dst> <plugin_name> <category> [type]
+# Helper: substitute template placeholders
 _scaffold_from_template() {
     local src="$1"
     local dst="$2"
     local plugin_name="$3"
-    local category="$4"
-    local type="${5:-}"
-    local today
-    today="$(date -u +"%Y-%m-%d")"
+    local category="${4:-}"
     sed \
         -e "s/{{PLUGIN_NAME}}/${plugin_name}/g" \
         -e "s/{{CATEGORY}}/${category}/g" \
-        -e "s/{{TYPE}}/${type}/g" \
-        -e "s/{{DATE}}/${today}/g" \
         "$src" > "$dst"
 }
 
 # Create new plugin from template
 create_plugin() {
     local plugin_name="$1"
+    shift
 
     # Validate name
     if [[ ! "$plugin_name" =~ ^[a-z][a-z0-9-]*$ ]]; then
@@ -606,78 +355,110 @@ create_plugin() {
         error "Plugin directory already exists: ${plugin_name}"
     fi
 
-    echo -e "${BOLD}Creating new plugin: ${CYAN}${plugin_name}${NC}\n"
+    # Parse component flags
+    local has_skill=false
+    local has_hook=false
+    local has_mcp=false
+    local has_agent=false
 
-    # Interactive prompts
-    read -p "Plugin type (skill/command/subagent/hybrid): " type
-    [[ ! "$type" =~ ^(skill|command|subagent|hybrid)$ ]] && error "Invalid type"
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --skill)  has_skill=true; shift ;;
+            --hook)   has_hook=true; shift ;;
+            --mcp)    has_mcp=true; shift ;;
+            --agent)  has_agent=true; shift ;;
+            *) error "Unknown flag: $1" ;;
+        esac
+    done
 
+    # If no flags given, prompt interactively
+    if [[ "$has_skill" == "false" && "$has_hook" == "false" && "$has_mcp" == "false" && "$has_agent" == "false" ]]; then
+        echo -e "${BOLD}Select components to include (space-separated numbers):${NC}"
+        echo "  1) Skill    (SKILL.md -- slash command or auto-invoked capability)"
+        echo "  2) Hook     (hooks.json -- event-driven automation)"
+        echo "  3) MCP      (.mcp.json -- external tool integration)"
+        echo "  4) Agent    (agent definition for subagent spawning)"
+        echo ""
+        read -p "Components [1]: " selections
+        selections="${selections:-1}"
+
+        for sel in $selections; do
+            case $sel in
+                1) has_skill=true ;;
+                2) has_hook=true ;;
+                3) has_mcp=true ;;
+                4) has_agent=true ;;
+                *) error "Invalid selection: $sel" ;;
+            esac
+        done
+    fi
+
+    echo -e "\n${BOLD}Creating new plugin: ${CYAN}${plugin_name}${NC}\n"
+
+    # Prompt for metadata
     read -p "Category (cluster-ops/debug/deploy/network/operator/ci-cd/util): " category
     [[ ! "$category" =~ ^(cluster-ops|debug|deploy|network|operator|ci-cd|util)$ ]] && error "Invalid category"
 
     read -p "Short description: " description
+    [[ -z "$description" ]] && error "Description cannot be empty"
     read -p "Author (your GitHub handle): " author
 
     local plugin_dir="${PLUGINS_DIR}/${plugin_name}"
 
-    # Resolve the templates directory for this plugin type.
-    # hybrid falls back to the subagent templates (basic structure only).
-    local templates_type="$type"
-    [[ "$type" == "hybrid" ]] && templates_type="subagent"
-    local templates_dir="${TEMPLATES_DIR}/${templates_type}"
+    # Validate required templates exist
+    [[ ! -f "${TEMPLATES_DIR}/plugin.json.template" ]] && error "Template not found: plugin.json.template"
+    [[ ! -f "${TEMPLATES_DIR}/README.md.template" ]] && error "Template not found: README.md.template"
 
-    if [[ ! -d "$templates_dir" ]]; then
-        error "Templates directory not found: ${templates_dir}"
+    # Create plugin directory with cleanup trap
+    trap 'rm -rf "$plugin_dir"' ERR
+    mkdir -p "${plugin_dir}/.claude-plugin"
+
+    # Generate plugin.json: substitute safe fields via sed, then inject
+    # description and author through jq to prevent JSON injection.
+    _scaffold_from_template "${TEMPLATES_DIR}/plugin.json.template" "${plugin_dir}/.claude-plugin/plugin.json" "$plugin_name" ""
+    local tmp_json
+    tmp_json=$(jq --arg desc "$description" --arg auth "$author" \
+        '.description = $desc | .author.name = $auth' \
+        "${plugin_dir}/.claude-plugin/plugin.json")
+    echo "$tmp_json" > "${plugin_dir}/.claude-plugin/plugin.json"
+
+    # Scaffold components
+    if [[ "$has_skill" == "true" ]]; then
+        mkdir -p "${plugin_dir}/skills/${plugin_name}"
+        (python3 - "${TEMPLATES_DIR}/SKILL.md.template" "${plugin_dir}/skills/${plugin_name}/SKILL.md" \
+            "$plugin_name" "$description" <<'PYEOF'
+import sys
+tmpl, dst, name, desc = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+content = open(tmpl, encoding='utf-8').read()
+for placeholder, value in [('{{PLUGIN_NAME}}', name), ('{{DESCRIPTION}}', desc)]:
+    content = content.replace(placeholder, value)
+open(dst, 'w', encoding='utf-8').write(content)
+PYEOF
+        ) || error "Failed to generate SKILL.md from template"
     fi
 
-    local required_templates=("plugin.yml.template" "README.md.template")
-    case "$type" in
-        skill)    required_templates+=("skill.md.template") ;;
-        command)  required_templates+=("command.sh.template") ;;
-        subagent) required_templates+=("agent.md.template") ;;
-        hybrid)
-            warn "hybrid type uses basic scaffolding — custom implementation required."
-            required_templates+=("agent.md.template")
-            ;;
-    esac
-    for tmpl in "${required_templates[@]}"; do
-        [[ -f "${templates_dir}/${tmpl}" ]] || error "Template file not found: ${templates_dir}/${tmpl}"
-    done
+    if [[ "$has_hook" == "true" ]]; then
+        mkdir -p "${plugin_dir}/hooks"
+        _scaffold_from_template "${TEMPLATES_DIR}/hooks.json.template" "${plugin_dir}/hooks/hooks.json" "$plugin_name" ""
+    fi
 
-    # All pre-flight checks passed — create the directory now.
-    # The trap ensures cleanup if anything fails from this point on.
-    trap 'rm -rf "$plugin_dir"' ERR
-    mkdir -p "$plugin_dir"
+    if [[ "$has_mcp" == "true" ]]; then
+        cp "${TEMPLATES_DIR}/mcp.json.template" "${plugin_dir}/.mcp.json"
+    fi
 
-    # plugin.yml: substitute safe fields via sed, then inject user-supplied
-    # description and author through yq to avoid YAML injection.
-    _scaffold_from_template "${templates_dir}/plugin.yml.template" "${plugin_dir}/plugin.yml" "$plugin_name" "$category" "$type"
-    DESCRIPTION="$description" AUTHOR="$author" \
-        yq eval -i '.description = env(DESCRIPTION) | .author = env(AUTHOR)' "${plugin_dir}/plugin.yml"
+    if [[ "$has_agent" == "true" ]]; then
+        mkdir -p "${plugin_dir}/agents"
+        _scaffold_from_template "${TEMPLATES_DIR}/agent.md.template" "${plugin_dir}/agents/${plugin_name}.md" "$plugin_name" ""
+    fi
 
-    # Type-specific file
-    case "$type" in
-        skill)
-            _scaffold_from_template "${templates_dir}/skill.md.template" "${plugin_dir}/skill.md" "$plugin_name" "$category"
-            ;;
-        command)
-            _scaffold_from_template "${templates_dir}/command.sh.template" "${plugin_dir}/command.sh" "$plugin_name" "$category"
-            chmod +x "${plugin_dir}/command.sh"
-            ;;
-        subagent|hybrid)
-            _scaffold_from_template "${templates_dir}/agent.md.template" "${plugin_dir}/agent.md" "$plugin_name" "$category"
-            ;;
-    esac
-
-    # README.md: single-pass substitution via python3 to handle all four
-    # placeholders atomically, including free-form user input (description, author).
-    (python3 - "${templates_dir}/README.md.template" "${plugin_dir}/README.md" \
+    # Generate README.md
+    (python3 - "${TEMPLATES_DIR}/README.md.template" "${plugin_dir}/README.md" \
         "$plugin_name" "$category" "$description" "$author" <<'PYEOF'
 import sys
-tmpl, dst, name, cat, desc, author = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6]
+tmpl, dst, name, cat, desc, auth = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6]
 content = open(tmpl, encoding='utf-8').read()
 for placeholder, value in [('{{PLUGIN_NAME}}', name), ('{{CATEGORY}}', cat),
-                            ('{{DESCRIPTION}}', desc), ('{{AUTHOR}}', author)]:
+                            ('{{DESCRIPTION}}', desc), ('{{AUTHOR}}', auth)]:
     content = content.replace(placeholder, value)
 open(dst, 'w', encoding='utf-8').write(content)
 PYEOF
@@ -685,29 +466,24 @@ PYEOF
 
     trap - ERR
 
+    # Show summary
     success "Plugin scaffolding created: ${plugin_dir}"
-    echo -e "\nNext steps:"
-    echo "  1. Edit ${plugin_dir}/plugin.yml to complete metadata"
-    echo "  2. Implement your skill/command"
-    echo "  3. Fill in <!-- TODO: --> markers in README.md and agent.md"
-    echo "  4. Test with: ./marketplace validate ${plugin_name}"
-    echo "  5. Install with: ./marketplace install ${plugin_name}"
+    echo -e "\n${BOLD}Components:${NC}"
+    [[ "$has_skill" == "true" ]] && echo "  - Skill:  skills/${plugin_name}/SKILL.md"
+    [[ "$has_hook" == "true" ]]  && echo "  - Hook:   hooks/hooks.json"
+    [[ "$has_mcp" == "true" ]]   && echo "  - MCP:    .mcp.json"
+    [[ "$has_agent" == "true" ]] && echo "  - Agent:  agents/${plugin_name}.md"
+    echo ""
+    echo "Next steps:"
+    echo "  1. Implement your plugin components"
+    echo "  2. Fill in TODO markers"
+    echo "  3. Test with: ./marketplace validate ${plugin_name}"
+    echo "  4. Update catalog: ./marketplace catalog-update"
+    echo "  5. Users install via: /plugin install ${plugin_name}"
 }
 
 # Main CLI handler
 main() {
-    # Ensure directories exist
-    mkdir -p "$REGISTRY_DIR"
-
-    # Initialize state file if missing
-    if [[ ! -f "$STATE_FILE" ]]; then
-        cat > "$STATE_FILE" <<EOF
-version: "1.0"
-installed_plugins: []
-last_update_check: null
-EOF
-    fi
-
     # Check dependencies
     check_dependencies
 
@@ -727,77 +503,54 @@ EOF
             [[ -z "${1:-}" ]] && error "Usage: marketplace search <query>"
             list_plugins "$1"
             ;;
-        install)
-            [[ -z "${1:-}" ]] && error "Usage: marketplace install <plugin-name> [--force]"
-            local force_flag="false"
-            [[ "${2:-}" == "--force" ]] && force_flag="true"
-            install_plugin "$1" "$force_flag"
-            ;;
-        uninstall|remove)
-            [[ -z "${1:-}" ]] && error "Usage: marketplace uninstall <plugin-name>"
-            uninstall_plugin "$1"
-            ;;
-        update)
-            if [[ -n "${1:-}" ]]; then
-                info "Updating plugin: $1"
-                install_plugin "$1" "true"
-            else
-                info "Updating all installed plugins..."
-                while IFS= read -r name; do
-                    [[ -z "$name" ]] && continue
-                    install_plugin "$name" "true"
-                done < <(yq eval '.installed_plugins[].name' "$STATE_FILE")
-            fi
-            ;;
         validate)
             [[ -z "${1:-}" ]] && error "Usage: marketplace validate <plugin-name>"
             validate_plugin "$1"
             ;;
-        status)
-            show_status
-            ;;
         new|create)
-            [[ -z "${1:-}" ]] && error "Usage: marketplace new <plugin-name>"
-            create_plugin "$1"
+            [[ -z "${1:-}" ]] && error "Usage: marketplace new <plugin-name> [--skill] [--hook] [--mcp] [--agent]"
+            create_plugin "$@"
             ;;
         catalog-update)
             update_catalog
             ;;
         help|--help|-h)
             cat <<EOF
-${BOLD}Plugin Marketplace CLI${NC}
+${BOLD}Plugin Marketplace CLI${NC} (Developer Tool)
 
 ${BOLD}Usage:${NC}
   marketplace <command> [arguments]
 
 ${BOLD}Commands:${NC}
   ${CYAN}list${NC} [filter]              List all available plugins (optionally filtered)
-  ${CYAN}search${NC} <query>             Search plugins by name, category, or description
+  ${CYAN}search${NC} <query>             Search plugins by name or description
   ${CYAN}show${NC} <plugin>              Show detailed information about a plugin
-  ${CYAN}install${NC} <plugin> [--force] Install a plugin
-  ${CYAN}uninstall${NC} <plugin>         Uninstall a plugin
-  ${CYAN}update${NC} [plugin]            Update plugin(s) to latest version
-  ${CYAN}status${NC}                     Show installed plugins and check for updates
-  ${CYAN}validate${NC} <plugin>          Validate plugin metadata
-  ${CYAN}new${NC} <name>                 Create new plugin from template
-  ${CYAN}catalog-update${NC}             Rebuild catalog from plugins directory
-  ${CYAN}help${NC}                       Show this help message
+  ${CYAN}validate${NC} <plugin>          Validate plugin structure and metadata
+  ${CYAN}new${NC} <name> [flags]         Create new plugin from template
+  ${CYAN}catalog-update${NC}             Rebuild .claude-plugin/marketplace.json
+
+${BOLD}Component Flags for 'new':${NC}
+  --skill                    Include a skill (SKILL.md)
+  --hook                     Include hooks (hooks.json)
+  --mcp                      Include MCP server config (.mcp.json)
+  --agent                    Include agent definition
 
 ${BOLD}Examples:${NC}
-  marketplace list                    # List all plugins
-  marketplace search network          # Search for network plugins
-  marketplace show ovn-topology       # Show plugin details
-  marketplace install ovn-topology    # Install a plugin
-  marketplace update                  # Update all plugins
-  marketplace new my-plugin           # Create new plugin
+  marketplace list                              # List all plugins
+  marketplace search network                    # Search for network plugins
+  marketplace show ovn-topology                 # Show plugin details
+  marketplace new my-plugin --skill --agent     # Create plugin with skill + agent
+  marketplace new my-plugin                     # Create plugin (interactive)
+  marketplace catalog-update                    # Rebuild marketplace catalog
+
+${BOLD}User Installation:${NC}
+  /plugin marketplace add openshift-eng/edge-tooling
+  /plugin install <plugin-name>
 
 ${BOLD}Documentation:${NC}
   Plugin development: plugins/docs/DEVELOPMENT.md
   Contributing:       plugins/docs/CONTRIBUTING.md
   Plugin structure:   plugins/README.md
-
-${BOLD}Support:${NC}
-  Report issues at: https://github.com/openshift-eng/edge-tooling/issues
 EOF
             ;;
         *)

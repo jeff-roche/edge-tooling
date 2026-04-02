@@ -1,0 +1,45 @@
+---
+name: {{PLUGIN_NAME}}
+description: {{DESCRIPTION}}
+user-invocable: true
+---
+
+# {{PLUGIN_NAME}}
+
+## Purpose
+
+<!-- TODO: Describe what this skill does and when Claude should use it -->
+
+## Prerequisites
+
+- OpenShift cluster accessible (KUBECONFIG set)
+- Required CLI tools: `oc`, `kubectl`
+
+## Steps
+
+### 1. Validate Environment
+
+- Check KUBECONFIG is set
+- Verify cluster connectivity: `oc whoami`
+
+### 2. Gather Information
+
+- Cluster version: `oc version`
+- Relevant resources: `oc get <resource>`
+
+### 3. Perform Analysis
+
+<!-- TODO: Define the analysis steps -->
+
+### 4. Present Results
+
+- Summarize findings
+- Suggest next steps
+
+## Examples
+
+### Example 1
+
+**User:** "Use {{PLUGIN_NAME}} to check X"
+
+**Claude:** Runs the skill steps and presents structured output.

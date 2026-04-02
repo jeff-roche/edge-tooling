@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{{PLUGIN_NAME}} hook executed'",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

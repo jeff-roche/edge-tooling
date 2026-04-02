@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "{{PLUGIN_NAME}}": {
+      "command": "my-mcp-command",
+      "args": ["--arg", "value"],
+      "env": {}
+    }
+  }
+}
