@@ -1,0 +1,10 @@
+{
+  "name": "edge-tooling",
+  "description": "Claude Code plugins for OpenShift and edge computing workflows",
+  "plugins": [
+    {
+      "name": "hello-world",
+      "path": "plugins/hello-world"
+    }
+  ]
+}

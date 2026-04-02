@@ -1,0 +1,25 @@
+# {{PLUGIN_NAME}}
+
+{{DESCRIPTION}}
+
+## Installation
+
+Install via Claude Code's plugin system:
+
+```text
+/plugin marketplace add openshift-eng/edge-tooling
+/plugin install {{PLUGIN_NAME}}
+```
+
+## Usage
+
+<!-- TODO: Describe usage -->
+
+## Requirements
+
+- **Claude Code:** >= 1.0.0
+- **Category:** {{CATEGORY}}
+
+## Author
+
+{{AUTHOR}}
