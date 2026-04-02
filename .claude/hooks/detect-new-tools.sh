@@ -26,6 +26,7 @@ DOCUMENTED_TOOLS=(
     "sno-deploy"
     "payload-monitor"
     "environments/lvm-operator"
+    "plugins"
 )
 
 # Function to check if a directory looks like a tool
