@@ -1,0 +1,8 @@
+{
+  "name": "vet-review",
+  "description": "Skeptical second pass on PR review findings — filters noise and validates real issues one by one",
+  "version": "1.0.0",
+  "author": { "name": "fonta-rh" },
+  "homepage": "https://github.com/openshift-eng/edge-tooling",
+  "license": "Apache-2.0"
+}

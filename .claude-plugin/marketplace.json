@@ -28,7 +28,19 @@
       "name": "edge-scrum",
       "source": "./plugins/edge-scrum",
       "description": "Agents, skills, and workflows relevant to scrum process management for the OpenShift Edge Team",
-      "version": "1.0.0" 
+      "version": "1.0.0"
+    },
+    {
+      "name": "challenge",
+      "source": "./plugins/challenge",
+      "description": "Adversarial hypothesis reviewer — systematically attacks theories and root cause analyses to find weaknesses before they find you",
+      "version": "1.0.0"
+    },
+    {
+      "name": "vet-review",
+      "source": "./plugins/vet-review",
+      "description": "Skeptical second pass on PR review findings — filters noise and validates real issues one by one",
+      "version": "1.0.0"
     }
   ]
 }
