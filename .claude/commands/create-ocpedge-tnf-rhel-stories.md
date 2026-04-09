@@ -1,12 +1,12 @@
 ---
-description: Create OCPEDGE stories for groups of related RHEL tickets, link them, and set components
+description: Create OCPEDGE stories for TNF RHEL verification tickets, link them, and set components
 allowed-tools: mcp__mcp-atlassian__jira_get_issue, mcp__mcp-atlassian__jira_search, mcp__mcp-atlassian__jira_create_issue, mcp__mcp-atlassian__jira_create_issue_link, mcp__mcp-atlassian__jira_search_fields, AskUserQuestion, Bash
 argument-hint: "[--dry-run] <RHEL ticket keys or JQL>"
 ---
 
-# Create OCPEDGE Stories for RHEL Tickets
+# Create OCPEDGE Stories for TNF RHEL Verification Tickets
 
-Create OCPEDGE stories for groups of related RHEL tickets that don't already have a corresponding story on the OCPEDGE backlog. Link the RHEL tickets to the new story and add the required components.
+Create OCPEDGE stories for groups of related TNF RHEL verification tickets that don't already have a corresponding story on the OCPEDGE backlog. Link the RHEL tickets to the new story and add the required components.
 
 ## Prerequisites
 
@@ -53,12 +53,12 @@ All subcommands accept/return JSON. Use Bash to call them.
 
 ### Option 1: Specific RHEL ticket keys
 ```
-/create-ocpedge-stories RHEL-12345 RHEL-12346 RHEL-12347
+/create-ocpedge-tnf-rhel-stories RHEL-12345 RHEL-12346 RHEL-12347
 ```
 
 ### Option 2: JQL query
 ```
-/create-ocpedge-stories jql:project = RHEL AND component = "resource-agents" AND status != Closed ORDER BY created DESC
+/create-ocpedge-tnf-rhel-stories jql:project = RHEL AND component = "resource-agents" AND status != Closed ORDER BY created DESC
 ```
 
 ### Option 3: No arguments (auto-discover)
