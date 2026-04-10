@@ -1,7 +1,8 @@
 ---
+name: create-ocpedge-tnf-rhel-stories
 description: Create OCPEDGE stories for TNF RHEL verification tickets, link them, and set components
-allowed-tools: mcp__mcp-atlassian__jira_get_issue, mcp__mcp-atlassian__jira_search, mcp__mcp-atlassian__jira_create_issue, mcp__mcp-atlassian__jira_create_issue_link, mcp__mcp-atlassian__jira_search_fields, AskUserQuestion, Bash
 argument-hint: "[--dry-run] <RHEL ticket keys or JQL>"
+user-invocable: true
 ---
 
 # Create OCPEDGE Stories for TNF RHEL Verification Tickets
@@ -10,26 +11,9 @@ Create OCPEDGE stories for groups of related TNF RHEL verification tickets that 
 
 ## Prerequisites
 
-This command requires the `mcp-atlassian` MCP server for Jira access. If it is not configured, tell the user to add the following to their `.mcp.json` (project root or `~/.claude/.mcp.json`):
-
-```json
-{
-  "mcpServers": {
-    "mcp-atlassian": {
-      "command": "uvx",
-      "args": ["mcp-atlassian"],
-      "env": {
-        "JIRA_URL": "https://redhat.atlassian.net",
-        "JIRA_USERNAME": "<your-email>@redhat.com",
-        "JIRA_API_TOKEN": "${JIRA_PERSONAL_TOKEN}"
-      }
-    }
-  }
-}
-```
-
-They also need:
+This command requires the `mcp-atlassian` MCP server for Jira access. This plugin includes an `.mcp.json` that configures it automatically. The user needs:
 - **`uvx`** installed (comes with [`uv`](https://docs.astral.sh/uv/getting-started/installation/))
+- **`JIRA_USERNAME`** environment variable set with their Red Hat email
 - **`JIRA_PERSONAL_TOKEN`** environment variable set with a [Jira API token](https://id.atlassian.com/manage-profile/security/api-tokens)
 
 If the `mcp__mcp-atlassian__jira_search` tool is not available when the command runs, stop and show these setup instructions instead of proceeding.
@@ -37,7 +21,7 @@ If the `mcp__mcp-atlassian__jira_search` tool is not available when the command 
 ## Helper Script
 
 This command uses a helper script for deterministic operations. The script is at:
-`.claude/commands/ocpedge_rhel_helper.py`
+`${PLUGIN_DIR}/ocpedge_rhel_helper.py`
 
 Available subcommands:
 - `parse-args <arguments>` — Parse input into `{mode, jql?, tickets?}`
@@ -76,7 +60,7 @@ If `$ARGUMENTS` contains `--dry-run`, the command runs Steps 0–5 (read-only op
 
 Run the helper to parse the input:
 ```bash
-python3 .claude/commands/ocpedge_rhel_helper.py parse-args $ARGUMENTS
+python3 "${PLUGIN_DIR}/ocpedge_rhel_helper.py" parse-args $ARGUMENTS
 ```
 
 This returns JSON with `mode` ("jql", "tickets", or "interactive"), `dry_run` (boolean), and the parsed values.
@@ -111,7 +95,7 @@ The JQL filter may only return a subset of clones for a given issue (e.g. only t
 
 Run the helper to find missing clones:
 ```bash
-python3 .claude/commands/ocpedge_rhel_helper.py find-missing-clones '<tickets_json>'
+python3 "${PLUGIN_DIR}/ocpedge_rhel_helper.py" find-missing-clones '<tickets_json>'
 ```
 
 This returns a JSON array of ticket keys that are referenced via clone links but weren't in the search results. For each missing key, fetch it with `jira_get_issue` and add it to the ticket set. Then run `find-missing-clones` again on the expanded set — repeat until no new clones are found (this walks the full clone tree via the parent).
@@ -143,7 +127,7 @@ Extract from each ticket:
 Run the helper script to group tickets deterministically:
 
 ```bash
-python3 .claude/commands/ocpedge_rhel_helper.py group-tickets '<tickets_json>'
+python3 "${PLUGIN_DIR}/ocpedge_rhel_helper.py" group-tickets '<tickets_json>'
 ```
 
 Pass a JSON array of ticket objects (each with `key`, `summary`, `issuelinks`, and optionally `description` fields from Step 2).
@@ -226,8 +210,8 @@ Accommodate any adjustments before proceeding.
 For each group that needs a new story, use the helper to generate the summary and description:
 
 ```bash
-python3 .claude/commands/ocpedge_rhel_helper.py generate-summary "<base_summary>"
-python3 .claude/commands/ocpedge_rhel_helper.py generate-description '["RHEL-111", "RHEL-222"]'
+python3 "${PLUGIN_DIR}/ocpedge_rhel_helper.py" generate-summary "<base_summary>"
+python3 "${PLUGIN_DIR}/ocpedge_rhel_helper.py" generate-description '["RHEL-111", "RHEL-222"]'
 ```
 
 Then create the issue:
