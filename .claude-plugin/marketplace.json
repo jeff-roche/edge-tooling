@@ -5,6 +5,10 @@
     {
       "name": "hello-world",
       "path": "plugins/hello-world"
+    },
+    {
+      "name": "microshift-ci",
+      "path": "plugins/microshift-ci"
     }
   ]
 }
