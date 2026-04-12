@@ -64,9 +64,8 @@ WORKDIR=/tmp/microshift-ci-claude-workdir.$(date +%y%m%d)
 **Goal**: Get detailed root cause analysis for each failed job using pre-downloaded artifacts.
 
 **Actions**:
-1. For each release that has jobs (from the Step 1 JSON output), read `${WORKDIR}/analyze-ci-release-<release>-jobs.json`
-2. For rebase PRs (if any), read `${WORKDIR}/analyze-ci-prs-jobs.json`
-3. For **every** job across all releases and PRs, launch a separate **Agent** (using the `Agent` tool, NOT the `Skill` tool):
+1. Use the JSON summary output from Step 1 to build agent prompts. Do NOT read the job JSON files into the main conversation — the prepare script already printed all job details (artifacts_dir, build_id, job name) and agents receive artifacts_dir directly in their prompt.
+2. For **every** failed job across all releases and PRs, launch a separate **Agent** (using the `Agent` tool, NOT the `Skill` tool). For PR jobs, only launch agents for jobs with FAILURE status.
 
    **For release jobs:**
    ```text
@@ -86,13 +85,10 @@ WORKDIR=/tmp/microshift-ci-claude-workdir.$(date +%y%m%d)
       Use the Write tool to save the file. The file must contain the complete analysis report."
    ```
 
-4. Launch **ALL** agents (all releases + PRs) in parallel using `run_in_background: true`
-5. Wait until ALL agents are confirmed complete before proceeding to Step 3
-
-**Progress Reporting**:
-```text
-Analyzing N jobs in parallel across M releases...
-```
+3. Launch **ALL** agents (all releases + PRs) in a single message using `run_in_background: true`
+4. After launching, say "Analyzing N jobs in parallel..." and STOP.
+5. As agent completion notifications arrive, respond with only "." (a single period) — no summaries, no status updates.
+6. Only after ALL agents are confirmed complete, produce a single brief count and proceed to Step 3.
 
 ### Step 3: Run Bug Correlation (Dry-Run)
 
@@ -108,8 +104,8 @@ Analyzing N jobs in parallel across M releases...
    ```text
    Agent: subagent_type=general_purpose, prompt="Run /microshift-ci:create-bugs rebase-release-<version>"
    ```
-4. Launch all create-bugs agents **in parallel**
-5. Wait until all create-bugs agents complete
+4. Launch all create-bugs agents **in parallel** with `run_in_background: true`
+5. Respond with only "." for each intermediate completion notification. Wait until all complete.
 6. Each agent produces `${WORKDIR}/analyze-ci-bugs-<source>.json`
 
 **Error Handling**:
