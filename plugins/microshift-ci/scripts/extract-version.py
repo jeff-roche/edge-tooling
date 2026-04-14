@@ -30,7 +30,6 @@ import re
 import urllib.request
 import urllib.error
 import urllib.parse
-import ssl
 from html.parser import HTMLParser
 
 
@@ -73,12 +72,7 @@ def fetch_url(url):
         if not url.startswith('https://'):
             return None, "Invalid URL scheme. Only HTTPS URLs are supported."
 
-        # Create SSL context that doesn't verify certificates
-        ssl_context = ssl.create_default_context()
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
-
-        with urllib.request.urlopen(url, timeout=30, context=ssl_context) as response:
+        with urllib.request.urlopen(url, timeout=30) as response:
             content = response.read().decode('utf-8')
             return content, None
     except urllib.error.URLError as e:
