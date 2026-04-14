@@ -38,7 +38,14 @@ This command works by:
 
 If no scenario name is provided it will prompt to the user what scenario to use.
 
-The command uses the `${SCRIPTS_DIR}/extract-version.py` helper script to determine the exact MicroShift version tested in the scenario.
+The command uses the `plugins/microshift-ci/scripts/extract-version.py` helper script (relative to repo root) to determine the exact MicroShift version tested in the scenario.
+
+## Scripts Directory
+
+All scripts are run relative to the repository root:
+```bash
+SCRIPTS_DIR=plugins/microshift-ci/scripts
+```
 
 ## Arguments
 - `$1` (job-url): URL to the Prow CI job - **Required**

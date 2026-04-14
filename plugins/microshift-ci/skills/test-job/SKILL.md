@@ -58,9 +58,9 @@ The command integrates with the `microshift-ci:test-scenario` command to provide
 
 ## Scripts Directory
 
-The plugin scripts are located relative to this skill file. Set once at the start:
+All scripts are run relative to the repository root:
 ```bash
-SCRIPTS_DIR="$(find ~/.claude/plugins -path '*/microshift-ci/scripts' -type d 2>/dev/null | head -1)"
+SCRIPTS_DIR=plugins/microshift-ci/scripts
 ```
 
 ## Implementation Steps

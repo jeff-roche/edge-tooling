@@ -84,6 +84,13 @@ ${TMP}/artifacts/${TEST_NAME}/openshift-microshift-infra-sos-aws/artifacts/sosre
 ```
 Where `${TEST_NAME}` is the test name directory (e.g., `e2e-aws-tests`, `e2e-aws-ovn-ocp-conformance-serial`). Use `find ${TMP}/artifacts -name 'sosreport-*.tar.xz'` to locate it.
 
+## Scripts Directory
+
+All scripts are run relative to the repository root:
+```bash
+SCRIPTS_DIR=plugins/microshift-ci/scripts
+```
+
 ## Work Directory
 
 Set once at the start and reference throughout:
