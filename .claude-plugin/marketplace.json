@@ -17,6 +17,18 @@
       "source": "./plugins/microshift-ci",
       "description": "MicroShift CI Automation",
       "version": "1.0.0"
+    },
+    {
+      "name": "microshift-release",
+      "source": "./plugins/microshift-release",
+      "description": "Set of tools to perform MicroShift Release Testing activities",
+      "version": "1.0.0"
+    },
+    {
+      "name": "edge-scrum",
+      "source": "./plugins/edge-scrum",
+      "description": "Agents, skills, and workflows relevant to scrum process management for the OpenShift Edge Team",
+      "version": "1.0.0" 
     }
   ]
 }
