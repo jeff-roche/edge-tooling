@@ -1,6 +1,6 @@
 {
-  "name": "vet-review",
-  "description": "Skeptical second pass on PR review findings — filters noise and validates real issues one by one",
+  "name": "pr-review",
+  "description": "Post-review utilities for PR workflows — vet and filter findings from automated reviews",
   "version": "1.0.0",
   "author": { "name": "fonta-rh" },
   "homepage": "https://github.com/openshift-eng/edge-tooling",
