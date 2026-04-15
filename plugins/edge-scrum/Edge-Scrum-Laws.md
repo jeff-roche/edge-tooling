@@ -6,7 +6,7 @@ Authoritative reference for AI agents and skills operating in the OpenShift Edge
 
 ## Team Roster
 
-An issue belongs to the team if a roster member is the **assignee** or the **QA Contact** (`customfield_12315948`). Exclude issues where neither field matches a roster member.
+An issue belongs to the team if a roster member is the **assignee** or the **QA Contact** (`customfield_10470`). Exclude issues where neither field matches a roster member.
 
 The roster is defined in `.roster.json` in the plugin directory (`plugins/edge-scrum/.roster.json`). This file is excluded from version control — copy `.roster.json.example` to `.roster.json` and populate it with your team. Agents and skills must read this file at runtime to determine team membership, per-member SP targets, and total capacity.
 
@@ -143,6 +143,19 @@ Work outside these workstreams uses a scoped label instead of a component.
 | OpenShift Edge Workstream - Adaptable Topology | Utility | NextGen Adaptable Topology issues |
 | OpenShift Edge Workstream - MicroShift to SNO | Utility | NextGen MicroShift to SNO issues |
 | OpenShift Edge Workstream - Bandwidth Reduction | Utility | Bandwidth Reduction issues |
+
+### Custom Fields (Red Hat Jira Instance)
+
+| Field | Custom Field ID | Type | Usage |
+|---|---|---|---|
+| Story Points | `customfield_10028` | Numeric | SP value for Stories, Tasks, Spikes |
+| Epic Link | `customfield_10014` | Issue link | Story → Epic relationship |
+| Parent Link | `customfield_10018` | Issue link | Epic → Feature/Initiative relationship |
+| QA Contact | `customfield_10470` | User picker | QA owner for an issue |
+| Flagged | `customfield_10021` | Array | Non-empty = impediment flag |
+| Doc Contact | `customfield_10473` | User picker | Documentation owner for an issue |
+| SME | `customfield_10475` | User picker | Subject Matter Expert for a Feature/Initiative |
+| T-shirt Size | `customfield_10795` | String | Size (XS/S/M/L/XL) for Features and Initiatives |
 
 ---
 
@@ -357,7 +370,7 @@ Technical role. Drives architectural alignment; advises on release backlog ranki
 
 ## Jira Conventions for Agents
 
-- **Issue ownership:** An issue belongs to the team if the assignee **or** QA Contact (`customfield_12315948`) is a roster member.
+- **Issue ownership:** An issue belongs to the team if the assignee **or** QA Contact (`customfield_10470`) is a roster member.
 - **Bugs always 0 SP.** Never suggest non-zero SP for a bug.
 - **Epics use T-shirt sizes**, not SP. Stories/Spikes/Tasks/Bugs use SP.
 - **Target version format:** Always use `4.x.0` (e.g., `4.16.0`) or `5.x.0`. Never use `4.x` or `5.x` alone.
