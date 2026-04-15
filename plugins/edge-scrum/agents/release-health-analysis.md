@@ -35,8 +35,13 @@ Substituted by the parent before spawning:
    Extract: `members` array — use `username` for ownership matching, `sp_target` per member for capacity.
    Derive `roster_size` (count of members) and `total_sp_per_sprint` (sum of all `sp_target` values).
    If a member is missing `sp_target`, default that member to 8. If the file is absent, halt with an error.
-2. `plugins/edge-scrum/Edge-Scrum-Laws.md`
-   Extract: done states per issue type, bugs-always-zero-SP rule, epic and feature sizing scales, OCPBUGS components.
+2. Load these law files from `plugins/edge-scrum/references/laws/`:
+   - `07-workflow-states.md` — done states per issue type
+   - `02-jira-stories.md` — bugs-always-zero-SP rule and story pointing
+   - `04-jira-epics.md` — epic sizing scales
+   - `05-jira-features.md` — feature/initiative sizing scales
+   - `01-jira-projects.md` — OCPBUGS components
+   - `06-jira-fields.md` — custom field IDs
 3. `{WORKDIR}/sprints.json`
 4. `{WORKDIR}/features.json`
 5. `{WORKDIR}/epics.json`

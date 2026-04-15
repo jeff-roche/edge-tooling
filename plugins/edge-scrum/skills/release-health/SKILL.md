@@ -9,7 +9,7 @@ user-invocable: true
 
 You are orchestrating a release health analysis for the OCPEDGE team. Delegate all Jira data-fetching and analysis to sub-agents — the main context is for coordination and report writing only.
 
-> **Before proceeding**: Read `plugins/edge-scrum/Edge-Scrum-Laws.md` as the canonical reference for team roster, story pointing rules, issue types, workflow states, sizing conventions, and hygiene expectations. The configuration and rules below are derived from the Laws — when in doubt, defer to the Laws document.
+> **Before proceeding**: Read `plugins/edge-scrum/references/Edge-Scrum-Laws.md` to find which law files apply to release health orchestration. For this skill, load: `laws/00-team-roster.md`, `laws/01-jira-projects.md`, `laws/05-jira-features.md`, `laws/06-jira-fields.md`, `laws/09-sprint-policies.md`, `laws/14-agent-conventions.md`. The configuration below is derived from the Laws — when in doubt, defer to the law files.
 
 ## Configuration
 
@@ -64,12 +64,13 @@ The user may provide arguments: `$ARGUMENTS`
 
 Read both files and hold in working memory:
 
-1. `plugins/edge-scrum/Edge-Scrum-Laws.md` — extract:
-   - **Jira projects and OCPBUGS components** — authoritative project keys and component names
-   - **Workflow states** — done/closed statuses per issue type
-   - **Story pointing rules** — sizing scale, bugs-always-zero rule, sprint SP target
-   - **Sizing scales** — Epic and Feature/Initiative T-shirt definitions
-   - **Issue hygiene expectations** — what a well-formed Feature, Initiative, Epic, and Story requires
+1. Load these law files from `plugins/edge-scrum/references/laws/`:
+   - `00-team-roster.md` — team capacity and `.roster.json` structure
+   - `01-jira-projects.md` — **Jira projects and OCPBUGS components** — authoritative project keys and component names
+   - `05-jira-features.md` — Feature/Initiative conventions and sizing
+   - `06-jira-fields.md` — custom field IDs
+   - `09-sprint-policies.md` — sprint capacity rules
+   - `14-agent-conventions.md` — agent orchestration conventions
 
 2. `plugins/edge-scrum/.roster.json` — extract:
    - **Team roster** — `username`, `display_name`, and `sp_target` per member
@@ -199,4 +200,4 @@ Cover: overall verdict, count on track vs. at risk, top 2–3 risks, one recomme
 - **Read-only**: This skill does not modify any Jira data.
 - **Agent definitions**: `plugins/edge-scrum/agents/release-health-*.md` — edit these to update agent behavior without touching orchestration logic.
 - **Work directory**: `{WORKDIR}` persists across agents within a run. Rerunning on the same day overwrites prior files.
-- **Laws file**: Agents read `plugins/edge-scrum/Edge-Scrum-Laws.md` directly — never hardcode roster, rules, or sizing in agent definitions.
+- **Laws files**: Agents read specific files from `plugins/edge-scrum/references/laws/` per the index at `plugins/edge-scrum/references/Edge-Scrum-Laws.md` — never hardcode roster, rules, or sizing in agent definitions.
