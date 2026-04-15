@@ -19,7 +19,7 @@ fields:
   parent_link:   customfield_10018   # Epic → Feature/Initiative
   qa_contact:    customfield_10470   # User picker
   docs_approver: customfield_10473   # User picker (Doc Contact)
-  story_points:  customfield_10028   # T-shirt size for epics
+  t_shirt_size:  customfield_10795   # T-shirt size for Epics (XS/S/M/L/XL)
 ```
 
 ## Components (Workstreams)
@@ -141,6 +141,7 @@ Create the issue using `jira_create_issue` with:
 - **Assignee**: provided assignee
 - **QA Contact** (`customfield_10470`): provided QA contact
 - **Doc Contact** (`customfield_10473`): provided doc contact
+- **T-shirt Size** (`customfield_10795`): provided size (XS/S/M/L/XL)
 - **Parent Link** (`customfield_10018`): parent key (if provided)
 
 ---
