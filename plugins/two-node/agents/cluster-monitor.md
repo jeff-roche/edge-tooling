@@ -38,7 +38,7 @@ If `{MANIFEST_PHASE}` is `day-1` and manifests exist in `{WORKDIR}/manifests/`:
 
 ```bash
 scp {WORKDIR}/manifests/*.yaml ec2-user@{EC2_IP}:~/
-ssh ec2-user@{EC2_IP} "KUBECONFIG=~/dev-scripts/ocp/ostest/auth/kubeconfig oc apply -f ~/<manifest>.yaml"
+ssh ec2-user@{EC2_IP} "KUBECONFIG=$KUBECONFIG_PATH oc apply -f ~/<manifest>.yaml"
 ```
 
 Wait 2-3 minutes after applying for operators to reconcile.

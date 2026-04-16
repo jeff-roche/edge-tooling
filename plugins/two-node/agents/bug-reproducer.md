@@ -53,8 +53,8 @@ This is the critical step. Based on `{REPRO_STEPS}` and `{REPRO_CONTEXT}`, execu
 #### Etcd / Pacemaker (fencing topology):
 ```bash
 # Check pacemaker and etcd status before repro
-ssh ec2-user@{EC2_IP} "KUBECONFIG=~/dev-scripts/ocp/ostest/auth/kubeconfig oc debug node/<master> -- chroot /host pcs status"
-ssh ec2-user@{EC2_IP} "KUBECONFIG=~/dev-scripts/ocp/ostest/auth/kubeconfig oc debug node/<master> -- chroot /host sudo podman exec etcd etcdctl member list -w table"
+ssh ec2-user@{EC2_IP} "KUBECONFIG=\$KP oc debug node/<master> -- chroot /host pcs status"
+ssh ec2-user@{EC2_IP} "KUBECONFIG=\$KP oc debug node/<master> -- chroot /host sudo podman exec etcd etcdctl member list -w table"
 
 # Examples of reproduction actions:
 # - Ban a resource: pcs resource ban etcd <node>
@@ -68,25 +68,25 @@ ssh ec2-user@{EC2_IP} "KUBECONFIG=~/dev-scripts/ocp/ostest/auth/kubeconfig oc de
 #### Fencing / STONITH:
 ```bash
 # Test fence agent
-ssh ec2-user@{EC2_IP} "KUBECONFIG=~/dev-scripts/ocp/ostest/auth/kubeconfig oc debug node/<master> -- chroot /host pcs stonith fence <node>"
+ssh ec2-user@{EC2_IP} "KUBECONFIG=\$KP oc debug node/<master> -- chroot /host pcs stonith fence <node>"
 
 # Check fencing history
-ssh ec2-user@{EC2_IP} "KUBECONFIG=~/dev-scripts/ocp/ostest/auth/kubeconfig oc debug node/<master> -- chroot /host stonith_admin --history"
+ssh ec2-user@{EC2_IP} "KUBECONFIG=\$KP oc debug node/<master> -- chroot /host stonith_admin --history"
 ```
 
 #### MCO / NTO / PerformanceProfile:
 ```bash
 # Apply manifests post-install
-ssh ec2-user@{EC2_IP} "KUBECONFIG=~/dev-scripts/ocp/ostest/auth/kubeconfig oc apply -f <manifest>"
+ssh ec2-user@{EC2_IP} "KUBECONFIG=\$KP oc apply -f <manifest>"
 
 # Trigger MCP update
-ssh ec2-user@{EC2_IP} "KUBECONFIG=~/dev-scripts/ocp/ostest/auth/kubeconfig oc get mcp -w"
+ssh ec2-user@{EC2_IP} "KUBECONFIG=\$KP oc get mcp -w"
 ```
 
 #### Networking:
 ```bash
 # Test connectivity between pods
-ssh ec2-user@{EC2_IP} "KUBECONFIG=~/dev-scripts/ocp/ostest/auth/kubeconfig oc run test-pod --image=busybox --restart=Never -- sleep 3600"
+ssh ec2-user@{EC2_IP} "KUBECONFIG=\$KP oc run test-pod --image=busybox --restart=Never -- sleep 3600"
 
 # Simulate network partition (if applicable)
 ```
@@ -94,16 +94,16 @@ ssh ec2-user@{EC2_IP} "KUBECONFIG=~/dev-scripts/ocp/ostest/auth/kubeconfig oc ru
 #### Upgrade:
 ```bash
 # Trigger upgrade
-ssh ec2-user@{EC2_IP} "KUBECONFIG=~/dev-scripts/ocp/ostest/auth/kubeconfig oc adm upgrade --to=<version>"
+ssh ec2-user@{EC2_IP} "KUBECONFIG=\$KP oc adm upgrade --to=<version>"
 ```
 
 #### Node disruption:
 ```bash
 # Reboot a node
-ssh ec2-user@{EC2_IP} "KUBECONFIG=~/dev-scripts/ocp/ostest/auth/kubeconfig oc debug node/<node> -- chroot /host reboot"
+ssh ec2-user@{EC2_IP} "KUBECONFIG=\$KP oc debug node/<node> -- chroot /host reboot"
 
 # Drain a node
-ssh ec2-user@{EC2_IP} "KUBECONFIG=~/dev-scripts/ocp/ostest/auth/kubeconfig oc adm drain <node> --ignore-daemonsets --delete-emptydir-data"
+ssh ec2-user@{EC2_IP} "KUBECONFIG=\$KP oc adm drain <node> --ignore-daemonsets --delete-emptydir-data"
 ```
 
 **IMPORTANT:**

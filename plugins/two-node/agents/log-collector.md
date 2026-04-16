@@ -143,8 +143,12 @@ done
 # Bootkube journal (if bootstrap VM still exists)
 BOOTSTRAP_IP=\$(sudo virsh domifaddr ostest_bootstrap 2>/dev/null | grep ipv4 | awk \"{print \\\$4}\" | cut -d/ -f1)
 if [ -n \"\$BOOTSTRAP_IP\" ]; then
-  ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@\$BOOTSTRAP_IP \"journalctl -u bootkube.service\" > ~/bug-logs/bootkube-journal.log 2>&1
-  ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@\$BOOTSTRAP_IP \"journalctl -u bootkube.service\" 2>/dev/null | grep -iE \"nto|tuned|node-tuning|performanceprofile\" > ~/bug-logs/bootkube-nto-filtered.log 2>&1
+  if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=5 core@\$BOOTSTRAP_IP \"echo OK\" >/dev/null 2>&1; then
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@\$BOOTSTRAP_IP \"journalctl -u bootkube.service\" > ~/bug-logs/bootkube-journal.log 2>&1
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@\$BOOTSTRAP_IP \"journalctl -u bootkube.service\" 2>/dev/null | grep -iE \"nto|tuned|node-tuning|performanceprofile\" > ~/bug-logs/bootkube-nto-filtered.log 2>&1
+  else
+    echo \"WARNING: Cannot SSH to bootstrap VM at \$BOOTSTRAP_IP — skipping bootkube journal collection\" > ~/bug-logs/bootkube-skipped.txt
+  fi
 fi
 '"
 ```
@@ -199,8 +203,12 @@ cp ~/dev-scripts/ocp/ostest/.openshift_install.log ~/bug-logs/openshift_install_
 # Bootstrap VM logs if accessible
 BOOTSTRAP_IP=\$(sudo virsh domifaddr ostest_bootstrap 2>/dev/null | grep ipv4 | awk \"{print \\\$4}\" | cut -d/ -f1)
 if [ -n \"\$BOOTSTRAP_IP\" ]; then
-  ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@\$BOOTSTRAP_IP \"journalctl -u bootkube.service\" > ~/bug-logs/bootkube-journal.log 2>&1
-  ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@\$BOOTSTRAP_IP \"journalctl -u kubelet\" > ~/bug-logs/bootstrap-kubelet.log 2>&1
+  if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=5 core@\$BOOTSTRAP_IP \"echo OK\" >/dev/null 2>&1; then
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@\$BOOTSTRAP_IP \"journalctl -u bootkube.service\" > ~/bug-logs/bootkube-journal.log 2>&1
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@\$BOOTSTRAP_IP \"journalctl -u kubelet\" > ~/bug-logs/bootstrap-kubelet.log 2>&1
+  else
+    echo \"WARNING: Cannot SSH to bootstrap VM at \$BOOTSTRAP_IP — skipping bootstrap log collection\" > ~/bug-logs/bootstrap-skipped.txt
+  fi
 fi
 '"
 ```

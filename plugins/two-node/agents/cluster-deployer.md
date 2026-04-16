@@ -199,11 +199,11 @@ ssh ec2-user@{EC2_IP} "sudo virsh list --all 2>/dev/null | grep ostest; echo '--
 | `openshift-install` + `level=fatal` | Installer crashed | Check error message |
 | No new output for 20+ minutes | Deployment stalled | Yes — kill and retry |
 
-If the deployment process finishes (PID no longer running), read the exit code:
+If the deployment process finishes (PID no longer running), confirm it has exited:
 ```bash
 DEPLOY_PID=$(cat {WORKDIR}/deploy.pid 2>/dev/null)
-wait $DEPLOY_PID
-echo $?
+while kill -0 $DEPLOY_PID 2>/dev/null; do sleep 10; done
+echo "Deployment process $DEPLOY_PID has exited"
 ```
 
 **If deployment failed**, also check the installer log on EC2 for more detail:

@@ -198,7 +198,7 @@ If classified as a test bug, set `"bug_type": "test"` and `"test_bug_reason": "e
 If classified as a product bug, set `"bug_type": "product"`.
 If unclear, set `"bug_type": "unclear"`.
 
-### 9a. Assess Dev-Scripts Environment Feasibility
+### 9a. Assess Dev-Scripts Environment Feasibility (skip if test bug)
 
 Check whether the bug's reproduction conditions can be met in a dev-scripts VM environment. Dev-scripts deploys libvirt VMs on EC2 — it has inherent limitations compared to real bare metal.
 
@@ -224,7 +224,7 @@ Check whether the bug's reproduction conditions can be met in a dev-scripts VM e
 If the bug requires conditions dev-scripts cannot provide, set `"environment_feasible": false` and `"environment_blockers": ["list of what's missing and why"]`.
 Otherwise set `"environment_feasible": true`.
 
-### 9b. Extract Reproduction Steps
+### 10. Extract Reproduction Steps
 
 Parse the description and comments for concrete reproduction steps. Look for:
 
@@ -240,14 +240,14 @@ Structure the steps as an ordered list in `repro_steps`. Include:
 - What to observe/check after each action
 - Expected outcome (what the bug looks like)
 
-### 10. Determine Bug Condition and Detection (skip if test bug)
+### 11. Determine Bug Condition and Detection (skip if test bug)
 
 Based on all gathered data, define:
 - **bug_condition**: What the bug looks like when reproduced (e.g., "start logs 'is not in the member list yet' in a loop", "MCP DEGRADED with bootstrap MC mismatch", "pcs status shows node UNCLEAN")
 - **detection_commands**: Specific commands to check if the bug is present
 - **success_criteria**: What a healthy cluster looks like (for comparison)
 
-### 9. Write Output
+### 12. Write Output
 
 Write `{WORKDIR}/bug-analysis.json`:
 

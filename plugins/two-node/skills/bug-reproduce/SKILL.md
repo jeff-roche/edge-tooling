@@ -126,7 +126,7 @@ If either is missing, stop with:
 **Create work directory:**
 
 ```bash
-WORKDIR=/tmp/two-node-bug-reproduce-$BUG_ID && mkdir -p $WORKDIR/manifests && echo $WORKDIR
+WORKDIR="/tmp/two-node-bug-reproduce-${BUG_ID}" && mkdir -p "$WORKDIR/manifests" && echo "$WORKDIR"
 ```
 
 Record `WORKDIR` for all subsequent phases.
@@ -251,11 +251,11 @@ Read `plugins/two-node/agents/bug-reproducer.md`. Substitute:
 
 Spawn the agent.
 
-**After agent completes**, read `$WORKDIR/reproducer-result.json`:
-- If `bug_reproduced` is `true`: inform user, proceed to Phase 5 (log collection).
-- If `not_reproduced`: inform user the bug did not manifest. Still proceed to log collection for evidence.
-- If `partial`: some indicators present — proceed to log collection for analysis.
-- If `blocked`: could not execute steps — report why and what's missing. Ask user: "Reproduction blocked because: $REASON. Would you like to **provide the missing piece** (e.g., a command, a manifest, a config change), **retry with adjustments**, or **skip to log collection**?" If the user provides additional info, re-spawn the bug-reproducer agent with the updated context.
+**After agent completes**, read `$WORKDIR/reproducer-result.json` and check the `status` field:
+- If `status` is `"bug_reproduced"`: inform user, proceed to Phase 5 (log collection).
+- If `status` is `"not_reproduced"`: inform user the bug did not manifest. Still proceed to log collection for evidence.
+- If `status` is `"partial"`: some indicators present — proceed to log collection for analysis.
+- If `status` is `"blocked"`: could not execute steps — report why and what's missing. Ask user: "Reproduction blocked because: $REASON. Would you like to **provide the missing piece** (e.g., a command, a manifest, a config change), **retry with adjustments**, or **skip to log collection**?" If the user provides additional info, re-spawn the bug-reproducer agent with the updated context.
 
 ---
 
