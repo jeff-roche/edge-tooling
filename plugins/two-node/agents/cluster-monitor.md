@@ -37,6 +37,7 @@ ssh ec2-user@{EC2_IP} "KUBECONFIG=$KUBECONFIG_PATH oc <command>"
 If `{MANIFEST_PHASE}` is `day-1` and manifests exist in `{WORKDIR}/manifests/`:
 
 ```bash
+ssh ec2-user@{EC2_IP} "mkdir -p ~/manifests"
 scp {WORKDIR}/manifests/*.yaml ec2-user@{EC2_IP}:~/manifests/
 ssh ec2-user@{EC2_IP} "KUBECONFIG=$KUBECONFIG_PATH oc apply -f ~/manifests/"
 ```
@@ -70,7 +71,7 @@ ssh ec2-user@{EC2_IP} "KUBECONFIG=$KUBECONFIG_PATH bash -c '
 
 If `{REPRO_TIMING}` is `during-install` or `both`, check for the bug condition at each poll iteration:
 
-- Run `{DETECTION_COMMANDS}` if provided
+- Run `{DETECTION_COMMANDS}` if provided — these are read-only inspection commands (e.g., `oc get`, `pcs status`, log checks). Review each command before execution and skip any that are destructive or modify cluster state.
 - Check for category-specific during-install indicators:
   - **mco/nto**: MCP DEGRADED with "bootstrap generated MC ... do not match"
   - **installer**: Bootstrap stuck, install log errors

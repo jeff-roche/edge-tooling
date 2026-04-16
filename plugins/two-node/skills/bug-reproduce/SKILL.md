@@ -242,7 +242,7 @@ Spawn the agent.
 
 ### Phase 4: Execute Reproduction Steps (spawn bug-reproducer agent)
 
-**Skip this phase if:** the bug was already detected during install, or `repro_timing` is `during-install` only.
+**Skip this phase if:** the bug was already detected during install, or `REPRO_TIMING` is `during-install` only.
 
 This is the core phase for most bugs. The cluster is healthy and we now execute the specific steps to trigger the bug.
 
@@ -287,7 +287,7 @@ Present the complete outcome to the user:
 **Cluster:** STILL RUNNING — available for manual inspection
 
 **Logs:** $LOCAL_LOG_DIR/
-**Findings Report:** $TNT_REPO_DIR/docs/${BUG_ID_LOWER}-findings.md
+**Findings Report:** $TNT_REPO_DIR/docs/$(echo $BUG_ID | tr '[:upper:]' '[:lower:]')-findings.md
 
 ### Next Steps
 - Review the findings report
