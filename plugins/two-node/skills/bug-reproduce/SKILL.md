@@ -165,7 +165,7 @@ Read `plugins/two-node/agents/bug-analyzer.md`. Substitute `{BUG_ID}` and `{WORK
 5. If `ocp_version` is `null`:
    - Ask the user: "Could not determine OCP version from the bug. What version should be deployed? (e.g., 4.20.14)"
    - Set `OCP_VERSION` and compute `RELEASE_IMAGE`
-6. Otherwise, extract `TOPOLOGY`, `RELEASE_IMAGE`, `CONFIG_HINTS`, `MANIFEST_PHASE`, `BUG_CATEGORIES`, `DETECTION_COMMANDS`, and `INSTALL_METHOD` from the analysis
+6. Otherwise, extract `TOPOLOGY`, `RELEASE_IMAGE`, `CONFIG_HINTS`, `MANIFEST_PHASE`, `BUG_CATEGORIES`, `DETECTION_COMMANDS`, `INSTALL_METHOD`, and `REPRO_TIMING` from the analysis
 7. If `manifest_phase` is `unknown` and manifests exist, ask the user: "Should these manifests be applied at day-0 (during install) or day-1 (after cluster is up)?"
 8. If `install_method` is `kcli`, note that a different playbook (`kcli-install.yml`) will be used
 

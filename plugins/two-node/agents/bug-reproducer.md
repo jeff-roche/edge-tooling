@@ -50,6 +50,15 @@ This is the critical step. Based on `{REPRO_STEPS}` and `{REPRO_CONTEXT}`, execu
 
 **Common reproduction patterns for TNA/TNF bugs:**
 
+**Note:** All example commands below use `$KP` for the kubeconfig path. When executing, each SSH command must discover `KP` first using the same pattern from Step 2:
+```bash
+ssh ec2-user@{EC2_IP} "bash -c '
+  KP=\$(ls ~/dev-scripts/ocp/ostest/auth/kubeconfig 2>/dev/null || ls ~/openshift-metal3/dev-scripts/ocp/ostest/auth/kubeconfig 2>/dev/null || ls ~/.kcli/clusters/ostest/auth/kubeconfig 2>/dev/null)
+  export KUBECONFIG=\$KP
+  <commands here>
+'"
+```
+
 #### Etcd / Pacemaker (fencing topology):
 ```bash
 # Check pacemaker and etcd status before repro

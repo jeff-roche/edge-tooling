@@ -22,7 +22,7 @@ For bugs that manifest DURING installation (e.g., bootstrap MC mismatch), this a
 Find the kubeconfig on EC2:
 
 ```bash
-KUBECONFIG_PATH=$(ssh ec2-user@{EC2_IP} "ls ~/dev-scripts/ocp/ostest/auth/kubeconfig 2>/dev/null || ls ~/openshift-metal3/dev-scripts/ocp/ostest/auth/kubeconfig 2>/dev/null" 2>/dev/null)
+KUBECONFIG_PATH=$(ssh ec2-user@{EC2_IP} "ls ~/dev-scripts/ocp/ostest/auth/kubeconfig 2>/dev/null || ls ~/openshift-metal3/dev-scripts/ocp/ostest/auth/kubeconfig 2>/dev/null || ls ~/.kcli/clusters/ostest/auth/kubeconfig 2>/dev/null" 2>/dev/null)
 ```
 
 If the kubeconfig doesn't exist yet, wait 2 minutes and retry (max 5 retries).
@@ -37,8 +37,8 @@ ssh ec2-user@{EC2_IP} "KUBECONFIG=$KUBECONFIG_PATH oc <command>"
 If `{MANIFEST_PHASE}` is `day-1` and manifests exist in `{WORKDIR}/manifests/`:
 
 ```bash
-scp {WORKDIR}/manifests/*.yaml ec2-user@{EC2_IP}:~/
-ssh ec2-user@{EC2_IP} "KUBECONFIG=$KUBECONFIG_PATH oc apply -f ~/<manifest>.yaml"
+scp {WORKDIR}/manifests/*.yaml ec2-user@{EC2_IP}:~/manifests/
+ssh ec2-user@{EC2_IP} "KUBECONFIG=$KUBECONFIG_PATH oc apply -f ~/manifests/"
 ```
 
 Wait 2-3 minutes after applying for operators to reconcile.

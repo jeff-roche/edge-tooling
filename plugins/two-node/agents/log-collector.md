@@ -35,11 +35,13 @@ These logs are collected regardless of bug category:
 
 ```bash
 ssh ec2-user@{EC2_IP} "bash -c '
-KP=\$(ls ~/dev-scripts/ocp/ostest/auth/kubeconfig 2>/dev/null || ls ~/openshift-metal3/dev-scripts/ocp/ostest/auth/kubeconfig 2>/dev/null)
+KP=\$(ls ~/dev-scripts/ocp/ostest/auth/kubeconfig 2>/dev/null || ls ~/openshift-metal3/dev-scripts/ocp/ostest/auth/kubeconfig 2>/dev/null || ls ~/.kcli/clusters/ostest/auth/kubeconfig 2>/dev/null)
 export KUBECONFIG=\$KP
 
-# Installer log
-cp ~/dev-scripts/ocp/ostest/.openshift_install.log ~/bug-logs/openshift_install.log 2>/dev/null
+# Installer log (try multiple known locations)
+cp ~/dev-scripts/ocp/ostest/.openshift_install.log ~/bug-logs/openshift_install.log 2>/dev/null || \
+cp ~/openshift-metal3/dev-scripts/ocp/ostest/.openshift_install.log ~/bug-logs/openshift_install.log 2>/dev/null || \
+echo \"WARNING: installer log not found at known paths\" > ~/bug-logs/openshift_install_missing.txt
 
 # Cluster state snapshot
 oc get nodes -o wide > ~/bug-logs/nodes.txt 2>&1
@@ -197,8 +199,10 @@ done
 **If `installer` in categories:**
 ```bash
 ssh ec2-user@{EC2_IP} "bash -c '
-# Full installer log
-cp ~/dev-scripts/ocp/ostest/.openshift_install.log ~/bug-logs/openshift_install_full.log 2>/dev/null
+# Full installer log (try multiple known locations)
+cp ~/dev-scripts/ocp/ostest/.openshift_install.log ~/bug-logs/openshift_install_full.log 2>/dev/null || \
+cp ~/openshift-metal3/dev-scripts/ocp/ostest/.openshift_install.log ~/bug-logs/openshift_install_full.log 2>/dev/null || \
+echo \"WARNING: installer log not found at known paths\" > ~/bug-logs/openshift_install_full_missing.txt
 
 # Bootstrap VM logs if accessible
 BOOTSTRAP_IP=\$(sudo virsh domifaddr ostest_bootstrap 2>/dev/null | grep ipv4 | awk \"{print \\\$4}\" | cut -d/ -f1)
