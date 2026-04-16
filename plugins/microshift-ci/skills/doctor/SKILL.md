@@ -40,7 +40,7 @@ WORKDIR=/tmp/microshift-ci-claude-workdir.$(date +%y%m%d)
 **Goal**: Deterministically collect all failed jobs and download their artifacts before any LLM analysis.
 
 **Actions**:
-1. Run `WORKDIR=/tmp/microshift-ci-claude-workdir.$(date +%y%m%d)` using the `Bash` tool
+1. Determine today's WORKDIR path by running `date +%y%m%d` and substituting into `/tmp/microshift-ci-claude-workdir.YYMMDD`. Use this value in all subsequent `--workdir` arguments.
 2. Run the prepare script:
    ```bash
    bash ${SCRIPTS_DIR}/doctor.sh prepare --workdir ${WORKDIR} $ARGUMENTS --rebase
