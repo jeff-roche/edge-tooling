@@ -47,6 +47,12 @@
       "source": "./plugins/two-node",
       "description": "Two-node topology (TNA/TNF) workflow automation — RHEL verification, Jira integration, and more",
       "version": "1.0.0"
+    },
+    {
+      "name": "edge-ocp-ci",
+      "source": "./plugins/edge-ocp-ci",
+      "description": "Edge OCP Payload Monitor — monitor OpenShift nightly payloads for edge topology (SNO/TNA/TNF) failures with AI-enriched analysis",
+      "version": "1.0.0"
     }
   ]
 }
