@@ -25,7 +25,7 @@ The plugin includes an `.mcp.json` that automatically configures the `mcp-atlass
 
 Create OCPEDGE stories for TNF RHEL verification tickets, link them to the RHEL bugs, and set the required components (`Two Node Fencing`, `QE`, `RHEL-Verification`).
 
-```
+```text
 # Auto-discover untested tickets
 /two-node:create-rhel-stories
 

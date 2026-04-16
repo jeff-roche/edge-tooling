@@ -46,7 +46,8 @@ echo '<large_json>' | python3 "${PLUGIN_DIR}/ocpedge_rhel_helper.py" group-ticke
 ```
 
 ### Option 2: JQL query
-```
+
+```text
 /two-node:create-rhel-stories jql:project = RHEL AND component = "resource-agents" AND status != Closed ORDER BY created DESC
 ```
 
