@@ -1,19 +1,19 @@
 ---
-name: bug-reproduce
+name: two-node:bug-reproducer
 description: Reproduce an OpenShift bug on a TNA (arbiter) or TNF (fencing) cluster — fetches Jira bug, deploys the right topology, monitors for the bug condition, collects logs, and generates a findings report
 allowed-tools: Agent, AskUserQuestion, Write, Read, Glob, Grep, Bash
 user-invocable: true
 argument-hint: "OCPBUGS-XXXXX"
 ---
 
-# Bug Reproduce TNA/TNF
+# Bug Reproducer TNA/TNF
 
 Automate OpenShift bug reproduction on Two-Node with Arbiter (TNA) or Two-Node with Fencing (TNF) clusters. Given a Jira bug ID, this skill fetches the bug, detects the topology, extracts manifests, deploys the cluster via dev-scripts, monitors for the bug condition, collects logs, and generates a findings report.
 
 ## Synopsis
 
-```
-/bug-reproduce OCPBUGS-66217
+```text
+/two-node:bug-reproducer OCPBUGS-66217
 ```
 
 ## Arguments

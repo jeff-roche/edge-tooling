@@ -19,7 +19,7 @@ Install via Claude Code's plugin system:
 
 The plugin includes an `.mcp.json` that automatically configures the `mcp-atlassian` MCP server.
 
-### Additional prerequisites for `/bug-reproduce`
+### Additional prerequisites for `/two-node:bug-reproducer`
 
 1. Claude Code session open at the **[Two-Node Toolbox (TNT)](https://github.com/openshift-eng/two-node-toolbox) repo** (`two-node-toolbox/deploy/` or `two-node-toolbox/deploy/openshift-clusters/`). Running from any other directory will result in an error.
 2. EC2 instance running with `make inventory` completed
@@ -53,12 +53,12 @@ Create OCPEDGE stories for TNF RHEL verification tickets, link them to the RHEL 
 - Closed story handling (creates new stories for untested tickets)
 - Subtask creation (verification + automation)
 
-### `/bug-reproduce`
+### `/two-node:bug-reproducer`
 
 Automated OpenShift bug reproduction for Two-Node with Arbiter (TNA) and Two-Node with Fencing (TNF) topologies.
 
 ```text
-/bug-reproduce OCPBUGS-66217
+/two-node:bug-reproducer OCPBUGS-66217
 ```
 
 One argument: a Jira issue key. The skill handles everything else:
