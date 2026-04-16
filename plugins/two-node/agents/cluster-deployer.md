@@ -72,6 +72,7 @@ For `fencing`:
 ```bash
 export NUM_MASTERS=2
 export NUM_WORKERS=0
+export NUM_ARBITERS=0
 export MASTER_MEMORY=32768
 export MASTER_VCPU=8
 export MASTER_DISK=100

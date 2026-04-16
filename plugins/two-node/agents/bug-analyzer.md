@@ -25,6 +25,7 @@ Use `jira_get_issue` MCP tool to fetch `{BUG_ID}`. Extract:
 Then use `jira_get_issue_comments` to fetch ALL comments on the bug. Comments often contain the most valuable reproduction data — successful reproduction configs, root cause analysis, log snippets, and workarounds.
 
 If the fetch fails, write an error to `{WORKDIR}/bug-analysis.json` and stop:
+
 ```json
 {"error": "Failed to fetch {BUG_ID}: <reason>"}
 ```
@@ -274,8 +275,7 @@ Write `{WORKDIR}/bug-analysis.json`:
     "ENABLE_WORKLOAD_PARTITIONING": "true",
     "MASTER_VCPU": "8",
     "IP_STACK": "v4",
-    "BMC_DRIVER": "redfish",
-    "install_method": "ipi"
+    "BMC_DRIVER": "redfish"
   },
   "bug_condition": "Brief description of what the bug looks like when reproduced",
   "detection_commands": [
