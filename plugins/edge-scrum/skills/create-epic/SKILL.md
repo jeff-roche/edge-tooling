@@ -7,7 +7,7 @@ user-invocable: true
 
 # Create Epic
 
-You are creating a new Epic in Jira for the OpenShift Edge team. All conventions come from `plugins/edge-scrum/Edge-Scrum-Laws.md` — read it before proceeding.
+You are creating a new Epic in Jira for the OpenShift Edge team. All conventions come from the Edge Scrum Laws. Read `plugins/edge-scrum/references/laws/` files listed under "Create Epic" in `plugins/edge-scrum/references/Edge-Scrum-Laws.md` before proceeding.
 
 ## Configuration
 
@@ -68,12 +68,14 @@ Arguments can include any combination of:
 
 ### Step 0: Load Edge Scrum Laws
 
-Read `plugins/edge-scrum/Edge-Scrum-Laws.md`. Extract:
+Read these law files from `plugins/edge-scrum/references/laws/`:
 
-- Valid components (workstreams)
-- T-shirt sizing scale
-- Epic refinement process requirements
-- Required fields and conventions
+- `01-jira-projects.md` — valid components (workstreams) and labels
+- `04-jira-epics.md` — Epic conventions and T-shirt sizing
+- `06-jira-fields.md` — custom field IDs
+- `07-workflow-states.md` — valid Epic states
+- `13-roles.md` — role assignments (QA Contact, Doc Contact)
+- `14-agent-conventions.md` — Jira conventions for agents
 
 The Laws are authoritative. When this skill and the Laws conflict, the Laws win.
 

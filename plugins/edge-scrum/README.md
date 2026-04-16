@@ -4,7 +4,7 @@ Agents, skills, and workflows for scrum process management on the OpenShift Edge
 
 ## Reference Documents
 
-**[`Edge-Scrum-Laws.md`](Edge-Scrum-Laws.md)** — The authoritative governance document for the OCPEDGE unified scrum. All skills and agents load this at runtime. It defines:
+**[`Edge-Scrum-Laws.md`](references/Edge-Scrum-Laws.md)** — The authoritative governance document for the OCPEDGE unified scrum. Skills and agents load specific law files from [`references/laws/`](references/laws/) at runtime. It defines:
 
 - **Team roster** — 18 team members with Jira usernames and per-sprint SP targets
 - **Jira projects** — OCPEDGE, OCPBUGS, OCPSTRAT, USHIFT and their roles
