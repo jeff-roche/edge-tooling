@@ -63,6 +63,18 @@ WORKDIR=/tmp/microshift-ci-claude-workdir.$(date +%y%m%d)
 - If `$ARGUMENTS` is empty, show usage and stop
 - If a release has no failed jobs, its jobs JSON will be an empty array — skip analysis for that release
 
+### Step 1b: Generate PCP Performance Graphs
+
+**Goal**: Generate disk I/O graphs from PCP archives for all jobs that have pmlogs.
+
+**Actions**:
+1. Run the graphs script (this is deterministic, no LLM needed):
+   ```bash
+   bash ${SCRIPTS_DIR}/doctor.sh graphs --workdir ${WORKDIR}
+   ```
+2. The script finds PCP archives in downloaded artifacts, extracts metrics, and generates PNG graphs at `${WORKDIR}/graphs/<build_id>/disk_io.png`.
+3. If prerequisites are missing (`pcp2json`, `matplotlib`), the script warns and skips — this is non-fatal.
+
 ### Step 2: Analyze Each Job Using /microshift-ci:prow-job
 
 **Goal**: Get detailed root cause analysis for each failed job using pre-downloaded artifacts.
@@ -173,6 +185,8 @@ HTML report generated: ${WORKDIR}/microshift-ci-doctor-report.html
 - MCP Jira server must be configured (for bug correlation)
 - Internet access to fetch job data from Prow/GCS
 - Bash shell, Python 3
+- `pcp-export-pcp2json` — for PCP graph generation
+- `matplotlib` Python package — for PCP graph plotting
 
 ## Related Skills
 
