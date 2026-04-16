@@ -77,7 +77,7 @@ The cluster is **always left running** after the skill completes so the user can
 
 **Output:**
 - Logs saved to `/tmp/two-node-bug-reproduce-<BUG_ID>/`
-- Findings report written to `docs/<bug-id-lowercase>-findings.md` in the TNT repo
+- Findings report written to `docs/<bug-id-lowercase>-findings.md` in the TNT repo (e.g., `docs/ocpbugs-66217-findings.md`)
 - Cluster left running for manual inspection
 
 ## Authors

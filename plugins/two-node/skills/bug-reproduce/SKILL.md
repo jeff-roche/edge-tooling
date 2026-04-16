@@ -92,7 +92,7 @@ If this fails, stop with:
 **Check 4: Pull secret**
 
 ```bash
-test -f $TNT_DEPLOY_DIR/roles/dev-scripts/install-dev/files/pull-secret.json && echo "EXISTS" || echo "MISSING"
+test -f "$TNT_DEPLOY_DIR/roles/dev-scripts/install-dev/files/pull-secret.json" && echo "EXISTS" || echo "MISSING"
 ```
 If missing, stop with:
 > Pull secret not found. Place your pull-secret.json at `roles/dev-scripts/install-dev/files/pull-secret.json`.
@@ -213,12 +213,12 @@ The deployer agent runs the `ansible-playbook` command and **monitors the deploy
 Clean the previous failed deployment before retrying:
 
 ```bash
-cd $TNT_DEPLOY_DIR && ansible-playbook clean.yml -i inventory.ini -e "interactive_mode=false"
+cd "$TNT_DEPLOY_DIR" && ansible-playbook clean.yml -i inventory.ini -e "interactive_mode=false"
 ```
 
 If `clean.yml` fails or doesn't exist for the install method, fall back to SSH cleanup:
 ```bash
-ssh ec2-user@$EC2_IP "cd ~/dev-scripts && make clean 2>/dev/null; cd ~/openshift-metal3/dev-scripts && make clean 2>/dev/null; true"
+ssh "ec2-user@$EC2_IP" "cd ~/dev-scripts && make clean 2>/dev/null; cd ~/openshift-metal3/dev-scripts && make clean 2>/dev/null; true"
 ```
 
 After cleanup completes, re-spawn the cluster-deployer agent with the same parameters.

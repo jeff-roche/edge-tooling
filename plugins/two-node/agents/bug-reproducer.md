@@ -48,7 +48,10 @@ If the cluster is not healthy, report the state to the user and ask whether to p
 
 This is the critical step. Based on `{REPRO_STEPS}` and `{REPRO_CONTEXT}`, execute the reproduction sequence.
 
-**Safety gate:** Before executing any reproduction step, review each command. Reject or skip commands that are clearly destructive to the host (e.g., `rm -rf /`, modifying EC2 instance state) or that exceed the scope of bug reproduction. All reproduction commands must target the cluster via `oc` or run on cluster nodes via `oc debug`, not directly on the EC2 hypervisor OS.
+**Safety gate:** Before executing any reproduction step:
+1. **Present** the exact command to the user for approval before running it.
+2. **Validate** each command is a read-only diagnostic or a scoped cluster operation (`oc`, `pcs`, `oc debug node/`). Block commands with destructive host-level patterns (`rm -rf`, `systemctl stop`, direct hypervisor OS modification) unless explicitly approved.
+3. **Scope** all commands to the cluster — reproduction commands must target cluster nodes via `oc debug` or cluster resources via `oc`, not the EC2 hypervisor OS directly.
 
 **Common reproduction patterns for TNA/TNF bugs:**
 
