@@ -1,7 +1,7 @@
 ---
 name: two-node:create-rhel-stories
+argument-hint: [--dry-run] <RHEL ticket keys or JQL>
 description: Create OCPEDGE stories for TNF RHEL verification tickets, link them, and set components
-argument-hint: "[--dry-run] <RHEL ticket keys or JQL>"
 user-invocable: true
 allowed-tools: Bash, Read, Glob, Grep, Agent, AskUserQuestion, mcp__mcp-atlassian__jira_search, mcp__mcp-atlassian__jira_get_issue, mcp__mcp-atlassian__jira_create_issue, mcp__mcp-atlassian__jira_create_issue_link
 ---
@@ -22,7 +22,7 @@ If the `mcp__mcp-atlassian__jira_search` tool is not available when the command 
 ## Helper Script
 
 This command uses a helper script for deterministic operations. The script is at:
-`${PLUGIN_DIR}/ocpedge_rhel_helper.py`
+`${PLUGIN_DIR}/scripts/ocpedge_rhel_helper.py`
 
 Available subcommands:
 - `parse-args <arguments>` — Parse input into `{mode, jql?, tickets?}`
@@ -35,7 +35,7 @@ Available subcommands:
 All subcommands accept/return JSON. Use Bash to call them.
 Pass `-` as the argument to read JSON from stdin (avoids ARG_MAX limits with large payloads):
 ```bash
-echo '<large_json>' | python3 "${PLUGIN_DIR}/ocpedge_rhel_helper.py" group-tickets -
+echo '<large_json>' | python3 "${PLUGIN_DIR}/scripts/ocpedge_rhel_helper.py" group-tickets -
 ```
 
 ## Input Formats
@@ -66,7 +66,7 @@ If `$ARGUMENTS` contains `--dry-run`, the command runs Steps 0–5 (read-only op
 
 Run the helper to parse the input:
 ```bash
-python3 "${PLUGIN_DIR}/ocpedge_rhel_helper.py" parse-args $ARGUMENTS
+python3 "${PLUGIN_DIR}/scripts/ocpedge_rhel_helper.py" parse-args $ARGUMENTS
 ```
 
 This returns JSON with `mode` ("jql", "tickets", or "interactive"), `dry_run` (boolean), and the parsed values.
@@ -101,7 +101,7 @@ The JQL filter may only return a subset of clones for a given issue (e.g. only t
 
 Run the helper to find missing clones:
 ```bash
-python3 "${PLUGIN_DIR}/ocpedge_rhel_helper.py" find-missing-clones '<tickets_json>'
+python3 "${PLUGIN_DIR}/scripts/ocpedge_rhel_helper.py" find-missing-clones '<tickets_json>'
 ```
 
 This returns a JSON array of ticket keys that are referenced via clone links but weren't in the search results. For each missing key, fetch it with `jira_get_issue` and add it to the ticket set. Then run `find-missing-clones` again on the expanded set — repeat until no new clones are found (this walks the full clone tree via the parent).
@@ -135,7 +135,7 @@ Extract from each ticket:
 Run the helper script to group tickets deterministically:
 
 ```bash
-python3 "${PLUGIN_DIR}/ocpedge_rhel_helper.py" group-tickets '<tickets_json>'
+python3 "${PLUGIN_DIR}/scripts/ocpedge_rhel_helper.py" group-tickets '<tickets_json>'
 ```
 
 Pass a JSON array of ticket objects (each with `key`, `summary`, `issuelinks`, and optionally `description` fields from Step 2).
@@ -222,8 +222,8 @@ Accommodate any adjustments before proceeding.
 For each group that needs a new story, use the helper to generate the summary and description:
 
 ```bash
-python3 "${PLUGIN_DIR}/ocpedge_rhel_helper.py" generate-summary "<base_summary>"
-python3 "${PLUGIN_DIR}/ocpedge_rhel_helper.py" generate-description '["RHEL-111", "RHEL-222"]'
+python3 "${PLUGIN_DIR}/scripts/ocpedge_rhel_helper.py" generate-summary "<base_summary>"
+python3 "${PLUGIN_DIR}/scripts/ocpedge_rhel_helper.py" generate-description '["RHEL-111", "RHEL-222"]'
 ```
 
 Then create the issue:
