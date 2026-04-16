@@ -336,6 +336,7 @@ After all operations complete, present a summary:
 ```bash
 /two-node:create-rhel-stories
 ```
+
 Searches for untested TNF resource-agents RHEL tickets using the default JQL and creates OCPEDGE stories.
 
 ### Example 2: Dry Run
@@ -343,6 +344,7 @@ Searches for untested TNF resource-agents RHEL tickets using the default JQL and
 ```bash
 /two-node:create-rhel-stories --dry-run
 ```
+
 Previews the plan without creating or modifying anything in Jira.
 
 ### Example 3: Specific Tickets
@@ -350,6 +352,7 @@ Previews the plan without creating or modifying anything in Jira.
 ```bash
 /two-node:create-rhel-stories RHEL-12345 RHEL-12346 RHEL-12347
 ```
+
 Processes only the specified RHEL tickets.
 
 ### Example 4: JQL Query
@@ -357,6 +360,7 @@ Processes only the specified RHEL tickets.
 ```bash
 /two-node:create-rhel-stories jql:project = RHEL AND component = "resource-agents" AND status != Closed ORDER BY created DESC
 ```
+
 Searches for tickets matching the JQL query.
 
 ### Example 5: Dry Run with Specific Tickets
@@ -364,6 +368,7 @@ Searches for tickets matching the JQL query.
 ```bash
 /two-node:create-rhel-stories --dry-run RHEL-12345 RHEL-12346
 ```
+
 Previews what would be created for specific tickets without modifying Jira.
 
 ## Notes
