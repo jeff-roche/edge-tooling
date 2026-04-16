@@ -160,7 +160,7 @@ HTML report generated: ${WORKDIR}/microshift-ci-doctor-report.html
 
 ## Prerequisites
 
-- `gcloud` CLI must be installed and authenticated for GCS access
+- `gsutil` CLI must be installed for GCS access (uses anonymous access on public buckets)
 - `gh` CLI must be authenticated with access to openshift/microshift
 - MCP Jira server must be configured (for bug correlation)
 - Internet access to fetch job data from Prow/GCS
