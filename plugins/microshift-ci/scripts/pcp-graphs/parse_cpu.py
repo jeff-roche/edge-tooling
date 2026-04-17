@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Parse pcp2json output with kernel.all.cpu.{user,sys,idle}.
+"""Parse pcp2json output with kernel.all.cpu.{user,sys,idle,wait.total}.
 
 pcp2json returns rate-converted values (ms/s). We normalize each sample
-to percentages by dividing each metric by the total (user+sys+idle).
+to percentages by dividing each metric by the total (user+sys+iowait+idle).
 
-Outputs a clean JSON with arrays: timestamps, user, sys, idle (all in %).
+Outputs a clean JSON with arrays: timestamps, user, sys, iowait, idle (all in %).
 """
 
 import argparse
@@ -103,10 +103,8 @@ def main():
         sys.exit(1)
 
     # pcp2json returns rate-converted values (ms/s per CPU).
-    # Normalize to percentages: divide by 10 * num_cpus to get 0-100%.
-    # First pass: detect num_cpus from the total (user+sys+idle should sum
-    # to ~1000*num_cpus for ms/s values).
-    result = {"timestamps": [], "user": [], "sys": [], "idle": []}
+    # Normalize to percentages by dividing each metric by the total.
+    result = {"timestamps": [], "user": [], "sys": [], "iowait": [], "idle": []}
 
     for sample in samples:
         ts_str = sample.get("@timestamp", "")
@@ -116,14 +114,18 @@ def main():
         user = get_value(sample, "kernel", "all", "cpu", "user")
         sys_val = get_value(sample, "kernel", "all", "cpu", "sys")
         idle = get_value(sample, "kernel", "all", "cpu", "idle")
+        iowait = get_value(sample, "kernel", "all", "cpu", "wait", "total")
         if user is None or sys_val is None or idle is None:
             continue
-        total = user + sys_val + idle
+        if iowait is None:
+            iowait = 0
+        total = user + sys_val + iowait + idle
         if total <= 0:
             continue
         result["timestamps"].append(ts)
         result["user"].append(round(100.0 * user / total, 1))
         result["sys"].append(round(100.0 * sys_val / total, 1))
+        result["iowait"].append(round(100.0 * iowait / total, 1))
         result["idle"].append(round(100.0 * idle / total, 1))
 
     if not result["timestamps"]:

@@ -33,6 +33,7 @@ def main():
     timestamps = []
     user_values = []
     sys_values = []
+    iowait_values = []
 
     for i, ts_str in enumerate(data["timestamps"]):
         try:
@@ -42,6 +43,7 @@ def main():
         timestamps.append(ts)
         user_values.append(float(data["user"][i]))
         sys_values.append(float(data["sys"][i]))
+        iowait_values.append(float(data.get("iowait", [0] * len(data["timestamps"]))[i]))
 
     if not timestamps:
         print("ERROR: No data points found in JSON", file=sys.stderr)
@@ -52,18 +54,20 @@ def main():
     # Peak values
     user_peak_idx = max(range(len(user_values)), key=lambda i: user_values[i])
     sys_peak_idx = max(range(len(sys_values)), key=lambda i: sys_values[i])
+    iowait_peak_idx = max(range(len(iowait_values)), key=lambda i: iowait_values[i])
 
-    print(f"Peak user: {user_values[user_peak_idx]:.1f}% at {timestamps[user_peak_idx].strftime('%H:%M:%S')}")
-    print(f"Peak sys:  {sys_values[sys_peak_idx]:.1f}% at {timestamps[sys_peak_idx].strftime('%H:%M:%S')}")
+    print(f"Peak user:   {user_values[user_peak_idx]:.1f}% at {timestamps[user_peak_idx].strftime('%H:%M:%S')}")
+    print(f"Peak sys:    {sys_values[sys_peak_idx]:.1f}% at {timestamps[sys_peak_idx].strftime('%H:%M:%S')}")
+    print(f"Peak iowait: {iowait_values[iowait_peak_idx]:.1f}% at {timestamps[iowait_peak_idx].strftime('%H:%M:%S')}")
 
     fig, (ax, ax_tbl) = plt.subplots(
         2, 1, figsize=(16, 7),
         gridspec_kw={"height_ratios": [8, 1]},
     )
 
-    ax.stackplot(timestamps, sys_values, user_values,
-                 labels=["System", "User"],
-                 colors=["tab:red", "tab:blue"],
+    ax.stackplot(timestamps, sys_values, iowait_values, user_values,
+                 labels=["System", "I/O Wait", "User"],
+                 colors=["tab:red", "tab:orange", "tab:blue"],
                  alpha=0.7)
 
     ax.set_xlabel(f"Time ({args.timezone})")
@@ -83,9 +87,10 @@ def main():
         cellText=[
             ["User", timestamps[user_peak_idx].strftime("%H:%M:%S"), f"{user_values[user_peak_idx]:.1f}%"],
             ["System", timestamps[sys_peak_idx].strftime("%H:%M:%S"), f"{sys_values[sys_peak_idx]:.1f}%"],
+            ["I/O Wait", timestamps[iowait_peak_idx].strftime("%H:%M:%S"), f"{iowait_values[iowait_peak_idx]:.1f}%"],
         ],
         colLabels=["Type", "Time", "Peak"],
-        cellColours=[["#dbe9f6"] * 3, ["#f6dbdb"] * 3],
+        cellColours=[["#dbe9f6"] * 3, ["#f6dbdb"] * 3, ["#fde2cc"] * 3],
         colColours=["#cccccc"] * 3,
         loc="center",
         cellLoc="center",

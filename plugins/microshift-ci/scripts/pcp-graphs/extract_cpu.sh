@@ -1,6 +1,6 @@
 #!/bin/bash
 # Extract CPU usage data from PCP archive using pcp2json with 15-second intervals.
-# Outputs JSON with arrays: timestamps, user, sys, idle (all in percentage)
+# Outputs JSON with arrays: timestamps, user, sys, iowait, idle (all in percentage)
 #
 # Usage: ./extract_cpu.sh <pcp-archive-dir> [output-json] [timezone]
 
@@ -18,7 +18,7 @@ TMPFILE=$(mktemp)
 trap 'rm -f "${TMPFILE}"' EXIT
 
 (cd "${DATA_DIR}" && pcp2json -a . -t 15sec \
-    kernel.all.cpu.user kernel.all.cpu.sys kernel.all.cpu.idle) \
+    kernel.all.cpu.user kernel.all.cpu.sys kernel.all.cpu.idle kernel.all.cpu.wait.total) \
     > "${TMPFILE}" 2>/dev/null || true
 
 # Parse pcp2json output into clean plot-ready JSON
