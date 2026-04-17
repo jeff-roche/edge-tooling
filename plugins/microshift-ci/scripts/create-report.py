@@ -284,7 +284,7 @@ def _extract_build_id(url):
     """Extract build_id (last numeric path component) from a Prow job URL."""
     if not url:
         return None
-    m = re.search(r"/(\d{16,})/?$", url)
+    m = re.search(r"/(\d+)/?$", url)
     return m.group(1) if m else None
 
 
