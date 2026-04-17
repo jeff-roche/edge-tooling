@@ -105,6 +105,7 @@ CSS = """\
         .ftype-test { background: #cce5ff; color: #004085; }
         .ftype-build { background: #e2d5f1; color: #4a235a; }
         .ftype-infra { background: #fde2cc; color: #7d4e24; }
+        .graph-source { font-size: 0.8em; color: #6c757d; font-style: italic; margin-bottom: 4px; }
         .graph-toggle { cursor: pointer; text-decoration: none; font-size: 1em; margin-left: 4px; }
         .graph-toggle:hover { opacity: 0.7; }
         .perf-graphs { margin: 6px 0 6px 0; padding: 8px 12px; background: #f8f9fa; border-left: 3px solid #6c757d; }
@@ -333,13 +334,15 @@ def _render_job_with_graphs(job):
     _graph_counter += 1
     gid = f"gp{_graph_counter}"
 
-    icon = f' <a class="graph-toggle" onclick="toggleGraph(\'{gid}\')" title="Performance graphs">&#x1F4CA;</a>'
+    icon = f' <a class="graph-toggle" onclick="toggleGraph(\'{gid}\')" title="Host performance graphs">&#x1F4CA;</a>'
 
     # Build tabbed graph panel (hidden by default)
+    header = '<div class="graph-source">Host metrics (PCP)</div>'
     if len(graphs) == 1:
         label, b64 = graphs[0]
         panel = (
             f'<div id="{gid}" class="perf-graphs" style="display:none">'
+            f'{header}'
             f'<img src="data:image/png;base64,{b64}" alt="{_e(label)}"/>'
             f'</div>'
         )
@@ -359,6 +362,7 @@ def _render_job_with_graphs(job):
             )
         panel = (
             f'<div id="{gid}" class="perf-graphs" style="display:none">'
+            f'{header}'
             f'<div class="graph-tabs">{"".join(tabs)}</div>'
             + "".join(panes)
             + '</div>'
