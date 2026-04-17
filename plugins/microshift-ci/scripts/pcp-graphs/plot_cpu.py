@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate CPU Usage graph from pcp2json-derived data.
 
-Reads a JSON file with arrays: timestamps, user, sys, idle (all in %).
+Reads a JSON file with arrays: timestamps, user, sys, iowait (all in %).
 Produces a stacked area chart of CPU usage.
 """
 

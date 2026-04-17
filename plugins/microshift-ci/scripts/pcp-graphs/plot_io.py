@@ -62,8 +62,8 @@ def main():
     bo_peak_val = bo_values[bo_peak_idx]
     q_peak_val = await_values[q_peak_idx]
 
-    print(f"Peak bi (read):  {bi_peak_val:,.0f} blk/s at {bi_peak_ts}")
-    print(f"Peak bo (write): {bo_peak_val:,.0f} blk/s at {bo_peak_ts}")
+    print(f"Peak bi (read):  {bi_peak_val:,.0f} ops/s at {bi_peak_ts}")
+    print(f"Peak bo (write): {bo_peak_val:,.0f} ops/s at {bo_peak_ts}")
     print(f"Peak await:      {q_peak_val:,.1f} ms at {q_peak_ts}")
 
     fig, (ax, ax_tbl) = plt.subplots(
@@ -77,7 +77,7 @@ def main():
             linewidth=0.8, alpha=0.9)
 
     ax.set_xlabel(f"Time ({args.timezone})")
-    ax.set_ylabel("Block I/O (blocks/s)")
+    ax.set_ylabel("I/O Operations (ops/s)")
     ax.set_title("Disk I/O Performance (15-second intervals)")
     ax.grid(True, alpha=0.3)
 

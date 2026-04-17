@@ -275,8 +275,8 @@ cmd_graphs() {
     WORKDIR="${WORKDIR:-/tmp/microshift-ci-claude-workdir.$(date +%y%m%d)}"
 
     if [[ ! -d "${WORKDIR}/artifacts" ]]; then
-        echo "Error: no artifacts found in ${WORKDIR}. Run 'prepare' first." >&2
-        return 1
+        echo "No artifacts found in ${WORKDIR}, skipping graph generation." >&2
+        return 0
     fi
 
     # Check prerequisites

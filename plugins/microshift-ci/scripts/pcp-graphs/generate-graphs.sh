@@ -76,8 +76,7 @@ generate_job_graphs() {
             echo "  ${build_id}: cpu_usage plot failed" >&2
         fi
     else
-        echo "  ${build_id}: no PCP data or extraction failed" >&2
-        return 0
+        echo "  ${build_id}: cpu extraction failed" >&2
     fi
 
     # Memory usage graph (tab order: 2)
