@@ -176,6 +176,7 @@ Save the extracted version for use in Step 8.
 Verify that the openshift/topolvm fork is not too far behind upstream topolvm/topolvm.
 
 #### 8.1: Get Sync Date from TopoLVM Replacement
+
 Parse the date (YYYYMMDD) from the pseudo-version extracted in Step 7.
 
 #### 8.2: Fetch Upstream TopoLVM Releases
@@ -320,6 +321,7 @@ If items are PENDING:
 ```
 
 ### Status Icons
+
 - DONE/PASS: `[x]` or checkmark
 - PENDING/NEEDS_UPDATE: `[ ]` or warning
 - FAILED/MISSING: `[!]` or error
