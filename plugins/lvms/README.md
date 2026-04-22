@@ -15,8 +15,6 @@ LVMS (Logical Volume Manager Storage) release, QE, and operational workflows.
 |---|---|
 | `/lvms:check-release-readiness` | Verify branches, dependencies, and configuration for an LVMS release |
 | `/lvms:z-stream-report` | Generate z-stream release urgency report for all supported versions |
-| `/lvms:analyze-test-failures` | Analyze LVMS test failures from ReportPortal |
-| `/lvms:port-otp-test` | Port a test from openshift-tests-private to the local repository |
 | `/lvms:setup-prereq` | Set up prerequisites to test unreleased LVMS operator builds |
 
 ## Usage
@@ -29,16 +27,6 @@ LVMS (Logical Volume Manager Storage) release, QE, and operational workflows.
 ### Z-stream urgency
 ```text
 /lvms:z-stream-report
-```
-
-### QE test failure analysis
-```text
-/lvms:analyze-test-failures <api-token> <reportportal-url>
-```
-
-### Port a test from openshift-tests-private
-```text
-/lvms:port-otp-test test/extended/storage/lvms.go "Author:rdeore-Critical-61586-[LVMS] [Block] Clone a pvc with Block VolumeMode"
 ```
 
 ### Set up prereqs for unreleased builds
