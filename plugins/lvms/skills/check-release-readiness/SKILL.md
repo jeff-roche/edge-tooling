@@ -60,6 +60,13 @@ UPSTREAM_BRANCH = from --branch or "main"
 UPSTREAM_BASE_URL = https://raw.githubusercontent.com/openshift/lvm-operator/${UPSTREAM_BRANCH}
 ```
 
+**If release version is not provided**, ask the user:
+
+```text
+What is the target OpenShift release version?
+Examples: 4.20, 4.21, 4.22
+```
+
 **If Kubernetes version is not provided**, ask the user:
 
 ```text
