@@ -15,6 +15,7 @@ allowed-tools: Bash, Read, Glob, Grep, WebFetch
 ```
 
 **Examples:**
+
 ```bash
 # Check upstream main branch (default) - will prompt for required information
 /lvms:check-release-readiness
@@ -49,7 +50,8 @@ Parse the provided arguments:
 - `--branch <branch>`: Check a specific upstream branch (default: `main`, ignored if --local)
 
 Set internal variables:
-```
+
+```text
 RELEASE_VERSION = from --version or first positional arg
 K8S_VERSION = from --k8s or second positional arg
 K8S_MINOR = minor version extracted from K8S_VERSION (e.g., 34 from 1.34)
@@ -59,7 +61,8 @@ UPSTREAM_BASE_URL = https://raw.githubusercontent.com/openshift/lvm-operator/${U
 ```
 
 **If Kubernetes version is not provided**, ask the user:
-```
+
+```text
 What is the target Kubernetes version for this release?
 (This is usually communicated via the release planning email)
 Examples: 1.32, 1.33, 1.34
@@ -75,7 +78,8 @@ Examples: 1.32, 1.33, 1.34
 ### Step 2: Initialize Checklist
 
 Create an internal checklist to track:
-```
+
+```text
 - [ ] Release branch exists: openshift/lvm-operator (release-X.Y)
 - [ ] Release branch exists: openshift/topolvm (release-X.Y)
 - [ ] Go version matches Kubernetes go version
@@ -103,13 +107,14 @@ gh api repos/openshift/topolvm/branches/release-{release_version} --jq '.name' 2
 ### Step 4: Check Go Version
 
 1. Fetch expected Go version from Kubernetes:
-```bash
-curl -s "https://raw.githubusercontent.com/kubernetes/kubernetes/v${K8S_VERSION}.0/go.mod" | grep "^go " | awk '{print $2}'
-```
 
-2. Read go.mod (using File Access Pattern) and extract: `grep "^go " | awk '{print $2}'`
+   ```bash
+   curl -s "https://raw.githubusercontent.com/kubernetes/kubernetes/v${K8S_VERSION}.0/go.mod" | grep "^go " | awk '{print $2}'
+   ```
 
-3. Compare minor versions (e.g., `1.24` from `1.24.11`):
+1. Read go.mod (using File Access Pattern) and extract: `grep "^go " | awk '{print $2}'`
+
+1. Compare minor versions (e.g., `1.24` from `1.24.11`):
    - Match: Mark as DONE
    - Mismatch: Mark as PENDING
 
@@ -141,21 +146,26 @@ CSI dependencies must use `k8s.io/* v0.{K8S_MINOR}.x`.
 - kubernetes-csi/external-snapshotter
 
 1. Read go.mod and extract current CSI versions: `grep "kubernetes-csi"`
-2. For each CSI dependency, check its go.mod to verify k8s.io/client-go version:
-```bash
-curl -s "https://raw.githubusercontent.com/kubernetes-csi/{repo}/{version}/go.mod" | grep "k8s.io/client-go"
-```
-3. If any use older k8s.io versions, find compatible versions:
-```bash
-gh api repos/kubernetes-csi/{repo}/tags --jq '.[0:10] | .[].name'
-```
+
+1. For each CSI dependency, check its go.mod to verify k8s.io/client-go version:
+
+   ```bash
+   curl -s "https://raw.githubusercontent.com/kubernetes-csi/{repo}/{version}/go.mod" | grep "k8s.io/client-go"
+   ```
+
+1. If any use older k8s.io versions, find compatible versions:
+
+   ```bash
+   gh api repos/kubernetes-csi/{repo}/tags --jq '.[0:10] | .[].name'
+   ```
 
 ### Step 7: Check TopoLVM Replacement
 
 Read go.mod and extract TopoLVM replacement: `grep "replace.*topolvm"`
 
 The replacement should point to `github.com/openshift/topolvm` with a pseudo-version format:
-```
+
+```text
 v0.X.Y-0.YYYYMMDDHHMMSS-COMMITSHA
 ```
 
@@ -169,6 +179,7 @@ Verify that the openshift/topolvm fork is not too far behind upstream topolvm/to
 Parse the date (YYYYMMDD) from the pseudo-version extracted in Step 7.
 
 #### 8.2: Fetch Upstream TopoLVM Releases
+
 ```bash
 gh api repos/topolvm/topolvm/releases --jq '.[0:5] | .[] | "\(.tag_name) \(.published_at)"' 2>/dev/null
 ```

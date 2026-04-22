@@ -29,6 +29,7 @@ Required environment variables:
 ### Step 1: Validate Environment
 
 Check that required environment variables are set:
+
 ```bash
 echo "JIRA_BASE_URL=${JIRA_BASE_URL:-(not set)}"
 echo "JIRA_EMAIL=${JIRA_EMAIL:-(not set)}"
@@ -36,7 +37,8 @@ echo "JIRA_API_TOKEN is $([ -n "$JIRA_API_TOKEN" ] && echo 'set' || echo 'NOT SE
 ```
 
 If any are not set, display an error and stop:
-```
+
+```text
 Error: Required environment variables are not set.
 Please set JIRA_BASE_URL, JIRA_EMAIL, and JIRA_API_TOKEN before running this command.
 
@@ -49,7 +51,8 @@ Example:
 ### Step 2: Fetch Support Timeline
 
 Fetch the LVMS support lifecycle data from Red Hat's official support policy page:
-```
+
+```text
 URL: https://access.redhat.com/support/policy/updates/openshift_operators
 ```
 
@@ -77,16 +80,19 @@ skopeo list-tags docker://registry.redhat.io/lvms4/lvms-operator-bundle 2>/dev/n
 Filter to only clean version tags matching `v{major}.{minor}.{patch}` (exclude `-source`, build suffix tags).
 
 **3.2: For each supported version:**
+
 1. Filter tags matching `v{version}.*` -- only clean semver tags
-2. Take the highest z-stream tag as the latest release
-3. Get the image creation date:
-```bash
-DATE=$(skopeo inspect --override-arch amd64 --override-os linux \
-  docker://registry.redhat.io/lvms4/lvms-operator-bundle:v{tag} 2>/dev/null | \
-  jq -r '.Created' | cut -d'T' -f1)
-```
-4. Calculate days since last release
-5. Count total number of z-stream releases
+1. Take the highest z-stream tag as the latest release
+1. Get the image creation date:
+
+   ```bash
+   DATE=$(skopeo inspect --override-arch amd64 --override-os linux \
+     docker://registry.redhat.io/lvms4/lvms-operator-bundle:v{tag} 2>/dev/null | \
+     jq -r '.Created' | cut -d'T' -f1)
+   ```
+
+1. Calculate days since last release
+1. Count total number of z-stream releases
 
 **Note**: `skopeo` must be installed and authenticated to `registry.redhat.io`. If unavailable, display install instructions and stop.
 
@@ -125,9 +131,9 @@ curl -s -X POST \
 
 **Group by version** (priority order):
 1. Target Version field -> extract minor version
-2. `fixVersions` -> first entry's minor version
-3. `versions` (Affects Version) -> first entry's minor version
-4. If none available -> "Unassigned" group
+1. `fixVersions` -> first entry's minor version
+1. `versions` (Affects Version) -> first entry's minor version
+1. If none available -> "Unassigned" group
 
 **Skip** issues targeting unreleased versions.
 

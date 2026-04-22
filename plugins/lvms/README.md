@@ -20,16 +20,19 @@ LVMS (Logical Volume Manager Storage) release, QE, and operational workflows.
 ## Usage
 
 ### Release readiness
+
 ```text
 /lvms:check-release-readiness --version 4.21 --k8s 1.34
 ```
 
 ### Z-stream urgency
+
 ```text
 /lvms:z-stream-report
 ```
 
 ### Set up prereqs for unreleased builds
+
 ```text
 /lvms:setup-prereq connected
 /lvms:setup-prereq disconnected
@@ -39,6 +42,7 @@ LVMS (Logical Volume Manager Storage) release, QE, and operational workflows.
 
 - `oc` CLI (authenticated with cluster-admin)
 - `gh` CLI (authenticated with GitHub access)
+- `oc-mirror` (for disconnected setup workflow)
 - `skopeo` (for z-stream report registry queries)
 - Jira credentials (`JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`) for z-stream report
 - **Category:** operator
