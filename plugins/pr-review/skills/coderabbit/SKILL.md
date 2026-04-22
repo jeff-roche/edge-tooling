@@ -260,7 +260,11 @@ gh api "repos/{OWNER}/{REPO}/pulls/{PR_NUMBER}/comments/{COMMENT_ID}/replies" \
   -f body="Won't fix — {one-line reason}."
 ```
 
-**Dropped items**: No reply. Don't add noise to the PR.
+**Dropped items**:
+```bash
+gh api "repos/{OWNER}/{REPO}/pulls/{PR_NUMBER}/comments/{COMMENT_ID}/replies" \
+  -f body="Won't fix — {one-line reason}."
+```
 
 ### 9. Final summary
 
@@ -268,8 +272,7 @@ gh api "repos/{OWNER}/{REPO}/pulls/{PR_NUMBER}/comments/{COMMENT_ID}/replies" \
 ## Done
 
 **Commit**: {SHA_SHORT} ({N} files changed)
-**PR replies posted**: {M} (applied: X, declined: Y)
-**Dropped without reply**: {Z}
+**PR replies posted**: {M} (applied: X, declined: Y, dropped: Z)
 
 Changes are local. Push when ready.
 ```
