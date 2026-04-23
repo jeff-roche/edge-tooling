@@ -124,6 +124,7 @@ Place each check at the right stage:
 | **One-time setup** | CodeRabbit config, tool installation | Documentation only — verify once, not every session |
 | **Session start** | Submodule staleness, undocumented tools | Repo-level hook (`SessionStart`) |
 | **Pre-tool / post-tool** | Block destructive git commands, detect secrets in file writes | Repo-level hook (`PreToolUse` / `PostToolUse`) |
+| **Stop (session end)** | Markdown linting, cleanup tasks | Repo-level hook (`Stop`) |
 | **Pre-commit** | Secret scanning, lint checks | Git pre-commit hook or repo-level `PreToolUse` on Bash matcher |
 
 ### CLI Tools vs MCP Servers
