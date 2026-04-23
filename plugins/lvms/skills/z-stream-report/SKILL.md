@@ -150,11 +150,11 @@ For each supported version, calculate an urgency score (0-100):
 
 | Factor | Weight | Scoring |
 |--------|--------|---------|
-| Days since last release | 25 pts max | <30d -> 0, 30-60d -> 10, 60-90d -> 15, 90-120d -> 20, >120d -> 25 |
+| Days since last release | 30 pts max | <30d -> 0, 30-60d -> 12, 60-90d -> 18, 90-120d -> 24, >120d -> 30 |
 | Open CVEs | 30 pts max | 15 per Critical/Important, 8 per Moderate, 3 per Low (capped at 30) |
 | Blocker/Critical bugs | 20 pts max | 10 per Blocker, 5 per Critical (capped at 20) |
 | Major bugs | 10 pts max | 2 per Major bug (capped at 10) |
-| Support window proximity | 15 pts max | <3mo -> 15, 3-6mo -> 10, 6-12mo -> 5, >12mo -> 0 |
+| Support window proximity | 10 pts max | <3mo -> 10, 3-6mo -> 7, 6-12mo -> 3, >12mo -> 0 |
 
 **Urgency levels:**
 - **CRITICAL** (75-100): Immediate z-stream release recommended
@@ -195,11 +195,11 @@ For each version (ordered by urgency score):
 ### Score Breakdown
 | Factor | Value | Points |
 |--------|-------|--------|
-| Days since release | NN days | X/25 |
+| Days since release | NN days | X/30 |
 | Open CVEs | N issues | X/30 |
 | Blocker/Critical bugs | N issues | X/20 |
 | Major bugs | N issues | X/10 |
-| Support window | N months left | X/15 |
+| Support window | N months left | X/10 |
 | **Total** | | **XX/100** |
 
 ### Open Issues
