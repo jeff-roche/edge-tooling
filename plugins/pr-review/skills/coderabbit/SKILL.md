@@ -108,7 +108,7 @@ Parse the review body for discrete findings:
 
 Tag each extracted finding with `SOURCE: review-body`. These
 findings have file/line context (unlike summary findings) but no
-individual `COMMENT_ID` — record the `REVIEW_ID` for reference.
+individual `COMMENT_ID` for inline replies.
 
 **2c. Inline review comments** (primary line-level actionable items):
 
