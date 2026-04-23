@@ -37,6 +37,12 @@
       "version": "1.0.0"
     },
     {
+      "name": "lvms",
+      "source": "./plugins/lvms",
+      "description": "LVMS (Logical Volume Manager Storage) release, QE, and operational workflows",
+      "version": "1.0.0"
+    },
+    {
       "name": "mcp-atlassian",
       "source": "./plugins/mcp-atlassian",
       "description": "Atlassian Jira MCP server for Claude Code — provides Jira tools via the mcp-atlassian container image",
