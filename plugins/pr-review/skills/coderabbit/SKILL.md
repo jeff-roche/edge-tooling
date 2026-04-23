@@ -27,8 +27,9 @@ finding, ask:
   because it's theoretically better?
 
 CodeRabbit's `suggestion` blocks are often mechanically correct but
-sometimes miss context. Its walkthrough/summary comments provide useful
-background but are not actionable items.
+sometimes miss context. Its walkthrough/summary comments are mostly
+noise, but occasionally contain substantive findings that don't appear
+as inline comments — these should be surfaced and vetted.
 
 **Kill the noise.** If a finding doesn't survive this filter, drop it.
 
@@ -55,15 +56,34 @@ Store `OWNER`, `REPO`, and `PR_NUMBER` for subsequent steps.
 
 ### 2. Fetch CodeRabbit comments
 
-**2a. Summary comment** (read for context, do not action):
+**2a. Summary comment** (read for context; extract actionable findings):
 
 ```bash
 gh api "repos/{OWNER}/{REPO}/issues/{PR_NUMBER}/comments" \
   --paginate --jq '[.[] | select(.user.login == "coderabbitai[bot]")]'
 ```
 
-Read the walkthrough and summary for background understanding of
-CodeRabbit's overall assessment. Do not create findings from it.
+Read the walkthrough and summary for background understanding.
+
+**Then parse for actionable findings.** CodeRabbit sometimes posts
+substantive findings only in the summary — cross-cutting issues,
+missing artifacts, or whole-PR concerns that don't map to a single
+diff line. These appear as bulleted or numbered items under headings
+like "Actionable comments", "Additional comments", or similar
+sections. Extract each discrete finding that:
+
+- Identifies a concrete bug, missing piece, or correctness issue
+- Is not just a walkthrough description of what the PR does
+- Is not a duplicate of an inline comment
+
+Tag each extracted finding with `SOURCE: summary`. These findings
+will not have a `COMMENT_ID`, `path`, or `line` — record the
+`ISSUE_COMMENT_ID` (the `id` of the issue comment they came from)
+for use in the reply step.
+
+**Most summary content is walkthrough noise — apply the same
+skepticism as inline findings.** Only surface items that would
+survive the vet filter in Step 4.
 
 **2b. Inline review comments** (these are the actionable items):
 
@@ -82,11 +102,16 @@ have already been addressed.
 
 **Edge cases:**
 
-- No CodeRabbit comments found → report
+- No inline comments AND no summary findings → report
   `"No CodeRabbit comments found on PR #{PR_NUMBER}."` and stop.
-- All comments already have replies → report
-  `"All CodeRabbit comments on PR #{PR_NUMBER} have already been addressed."`
+- No inline comments BUT summary findings exist → continue with
+  summary findings only. Report:
+  `"No CodeRabbit inline comments found. Triaging N finding(s) from the summary comment."`
+- All inline comments already have replies AND no summary findings →
+  report `"All CodeRabbit comments on PR #{PR_NUMBER} have already been addressed."`
   and stop.
+- All inline comments already have replies BUT summary findings exist →
+  continue with summary findings only.
 
 ### 3. Fetch PR diff
 
@@ -100,6 +125,13 @@ For each unaddressed inline CodeRabbit comment:
 
 1. **Read the full file** at `path` using the Read tool. You need the
    surrounding code, not just the diff hunk.
+
+For each summary-sourced finding (`SOURCE: summary`):
+
+1. **Identify affected files** from the finding's description and
+   the PR diff. Read the relevant files for context. If the finding
+   is about a missing artifact (e.g., missing docs, missing tests),
+   verify it is actually missing.
 
 2. **Parse the comment body**:
    - Extract ` ```suggestion ` code blocks if present — these are
@@ -159,16 +191,16 @@ Format:
 ## CodeRabbit Triage — PR #{PR_NUMBER}
 
 **PR**: {title}
-**CodeRabbit comments**: N total (M unaddressed)
-**Summary comment**: Read for context (not actioned)
+**CodeRabbit comments**: N inline (M unaddressed), K summary finding(s)
 
 ### Overview
 
-| # | Category | File | Line | Finding |
-|---|----------|------|------|---------|
-| 1 | AUTO-APPLY | `path/file.go` | 42 | Missing nil check on `foo` |
-| 2 | REVIEW | `pkg/api.go` | 15 | Error not propagated from `bar()` |
-| 3 | DROPPED | `utils/helper.go` | 33 | "Consider extracting to helper" |
+| # | Category | Source | File | Line | Finding |
+|---|----------|--------|------|------|---------|
+| 1 | AUTO-APPLY | inline | `path/file.go` | 42 | Missing nil check on `foo` |
+| 2 | REVIEW | inline | `pkg/api.go` | 15 | Error not propagated from `bar()` |
+| 3 | REVIEW | summary | — | — | No migration docs for schema change |
+| 4 | DROPPED | inline | `utils/helper.go` | 33 | "Consider extracting to helper" |
 
 ---
 
@@ -190,6 +222,11 @@ Assessment: <why this is valid but needs human judgment>
 - original code
 + fixed code
 ```
+
+**3. (summary) No migration docs for schema change**
+CodeRabbit: <brief quote from summary>
+Assessment: <why this is valid — e.g., schema change confirmed in diff but no migration guide found>
+Affected files: `db/migrations/0042_add_column.sql`
 
 ### Dropped (N)
 
@@ -246,7 +283,7 @@ For all confirmed items:
 
 ### 8. Reply to CodeRabbit comments
 
-For each actioned CodeRabbit comment, post an inline reply:
+**For inline-sourced findings**, post an inline reply:
 
 **Applied items**:
 ```bash
@@ -266,6 +303,27 @@ gh api "repos/{OWNER}/{REPO}/pulls/{PR_NUMBER}/comments/{COMMENT_ID}/replies" \
   -f body="Won't fix — {one-line reason}."
 ```
 
+**For summary-sourced findings**, post a top-level issue comment
+(since there is no inline comment to reply to):
+
+```bash
+gh api "repos/{OWNER}/{REPO}/issues/{PR_NUMBER}/comments" \
+  -f body="Re: CodeRabbit summary finding — {brief description}
+
+{Applied — fixed in {SHA_SHORT}. | Won't fix — {one-line reason}.}"
+```
+
+If multiple summary findings were actioned, batch them into a single
+issue comment to avoid noise:
+
+```bash
+gh api "repos/{OWNER}/{REPO}/issues/{PR_NUMBER}/comments" \
+  -f body="Addressed CodeRabbit summary findings:
+
+- {finding 1}: Applied — fixed in {SHA_SHORT}.
+- {finding 2}: Won't fix — {one-line reason}."
+```
+
 ### 9. Final summary
 
 ```
@@ -282,7 +340,10 @@ Changes are local. Push when ready.
 - **Rubber-stamping** — Challenge every finding. CodeRabbit's
   confidence is not your confidence.
 - **Applying before confirmation** — The table comes first. Always.
-- **Actioning the summary comment** — It's context, not findings.
+- **Treating summary walkthrough as findings** — Walkthrough
+  descriptions of what the PR does are context, not findings. Only
+  extract discrete actionable items (bugs, missing pieces,
+  correctness issues) from the summary.
 - **Re-processing replied comments** — If someone already addressed
   it, skip it.
 - **Generating new findings** — You are triaging CodeRabbit's output,
@@ -300,9 +361,12 @@ Changes are local. Push when ready.
 
 | Scenario | Action |
 |----------|--------|
-| No CodeRabbit comments | Report and stop |
-| All comments already replied to | Report and stop |
+| No inline comments and no summary findings | Report and stop |
+| No inline comments but summary findings exist | Triage summary findings only |
+| All inline comments replied to, no summary findings | Report and stop |
+| All inline comments replied to, summary findings exist | Triage summary findings only |
 | Suggestion block conflicts with current code | Recategorize to REVIEW |
 | Comment on a deleted file | Skip with note |
+| Summary finding duplicates an inline comment | Use inline version, skip summary duplicate |
 | All items dropped | Report: "None survive scrutiny as real issues" |
 | User wants to re-process replied comments | Allow if explicitly requested |
