@@ -85,7 +85,7 @@ for use in the reply step.
 skepticism as inline findings.** Only surface items that would
 survive the vet filter in Step 4.
 
-**2b. Inline review comments** (these are the actionable items):
+**2b. Inline review comments** (primary line-level actionable items):
 
 ```bash
 gh api "repos/{OWNER}/{REPO}/pulls/{PR_NUMBER}/comments" \
