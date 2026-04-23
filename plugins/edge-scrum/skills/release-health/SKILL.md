@@ -136,14 +136,14 @@ python3 plugins/edge-scrum/bin/transform-sprints.py \
 
 Call `jira_search` with:
 
-- **JQL:** `project = OCPSTRAT AND labels = "ocpedge-plan" AND labels = "{VERSION}-candidate" ORDER BY priority ASC`
+- **JQL:** `project = OCPSTRAT AND issuetype in (Feature, Initiative) AND labels in ("ocpedge-plan", "microshift") AND "Target Version" = "openshift-{VERSION}" AND (resolution is EMPTY OR resolution not in (Duplicate, Obsolete)) ORDER BY Rank ASC`
 - **Fields:** `key, summary, status, issuetype, priority, assignee, fixVersions, labels, description, issuelinks, customfield_10795, customfield_10470, customfield_10473, customfield_10475`
 - **limit:** `50`
 
 Paginate using `page_token`. If zero results, use fallback JQL (set `fallback_used`):
 
 ```
-project = OCPSTRAT AND labels = "ocpedge-plan" AND status not in (Done, Closed) ORDER BY priority ASC
+project = OCPSTRAT AND issuetype in (Feature, Initiative) AND labels in ("ocpedge-plan", "microshift") AND status not in (Done, Closed) ORDER BY priority ASC
 ```
 
 After all pages fetched, run:
@@ -173,8 +173,8 @@ Read `{WORKDIR}/features.json`. Extract `feature_keys_csv`.
 
 If `feature_keys` has more than 50 entries, split into batches of 50. For each batch, call `jira_search`:
 
-- **JQL:** `project in (OCPEDGE, USHIFT) AND "Parent Link" in ({feature_keys_batch_csv}) ORDER BY priority ASC`
-- **Fields:** `key, summary, status, assignee, labels, description, customfield_10028, customfield_10018, customfield_10470, customfield_10473, customfield_10475`
+- **JQL:** `project in (OCPEDGE, USHIFT) AND "Parent Link" in ({feature_keys_batch_csv}) ORDER BY Rank ASC`
+- **Fields:** `key, summary, status, assignee, labels, description, parent, customfield_10028, customfield_10018, customfield_10470, customfield_10473, customfield_10475`
 - **limit:** `50`
 
 Paginate using `page_token`. After all pages fetched, run:
@@ -201,6 +201,7 @@ Paginate using `page_token`. After all pages fetched, run:
 python3 plugins/edge-scrum/bin/transform-spikes.py \
   --input <all_persisted_file_paths> \
   --features-file {WORKDIR}/features.json \
+  --epics-file {WORKDIR}/epics.json \
   --sprints-file {WORKDIR}/sprints.json \
   --output {WORKDIR}/spikes.json
 ```
@@ -243,32 +244,16 @@ This agent reads all four data files, detects misplaced spikes, fetches child is
 
 ### Step 9: Generate Report (main context)
 
-1. Read `{WORKDIR}/analysis.md`
-2. Parse the `===ANALYSIS_META===` block for report header values
-3. Assemble the complete report:
-
-```markdown
-# Release Health: OCP {VERSION}
-
-**Analysis Date**: {TODAY}
-**Release Window**: Sprint {FIRST} – Sprint {LAST} | Branch Cut: Sprint {LAST}
-**Refinement Sprint**: Sprint {REFINEMENT_SPRINT_NUM} ({state}) — {features_with_spike}/{total_features} features have refinement spikes
-**Current Sprint**: Sprint {current} ({completed_count}/{total_count} sprints complete, {remaining} remaining)
-**Expected Dev Progress**: {expected_dev_completion_pct}% | **Actual Progress**: {actual_completion_pct}%
-**Overall Health**: {health_emoji} {overall_health}
-
-## Executive Summary
-
-{Write 3–5 sentences using top_risks, overall_health, feature counts, and sprint_recommendation from ANALYSIS_META.
-Cover: overall verdict, count on track vs. at risk, top 2–3 risks, one recommended priority this sprint.}
-
----
-
-{Paste each ===SECTION:*=== block in order, removing the sentinel lines}
-```
-
-1. Write to `.reports/release_health_{VERSION}_{TODAY}.md` using the `Write` tool.
-1. Clean up the work directory safely: `test -n "{WORKDIR}" && [[ "{WORKDIR}" == /tmp/release-health-* ]] && rm -rf -- "{WORKDIR}"`
+1. Read the report template from `plugins/edge-scrum/skills/release-health/report-template.md`
+2. Read `{WORKDIR}/analysis.md`
+3. Parse the `===ANALYSIS_META===` block for header values
+4. Substitute all `{placeholder}` values in the template:
+   - Header fields from release parameters and ANALYSIS_META
+   - `{executive_summary}`: Write 3-5 sentences using `top_risks`, `overall_health`, feature counts, and `sprint_recommendation` from ANALYSIS_META. Cover: overall verdict, count on track vs. at risk, top 2-3 risks, one recommended priority this sprint.
+   - `{DASHBOARD}`, `{FEATURE_DETAIL}`, `{EPIC_DETAIL}`, `{RISK_REGISTER}`, `{REFINEMENT_BACKLOG}`, `{SPRINT_FORECAST}`, `{ACTIONS}`: paste the corresponding `===SECTION:*===` block content from analysis.md, stripping the sentinel lines
+5. Add Jira links: replace all bare issue keys (OCPSTRAT-*, OCPEDGE-*, USHIFT-*, OCPBUGS-*) with `[KEY](https://redhat.atlassian.net/browse/KEY)` markdown links, skipping keys already inside link syntax
+6. Write to `.reports/release_health_{VERSION}_{TODAY}.md`
+7. Clean up: `test -n "{WORKDIR}" && [[ "{WORKDIR}" == /tmp/release-health-* ]] && rm -rf -- "{WORKDIR}"`
 
 ---
 

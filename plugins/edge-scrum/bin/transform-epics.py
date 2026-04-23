@@ -26,15 +26,17 @@ def transform_epic(raw):
     else:
         size = "Unsized"
 
+    desc = raw.get("description") or ""
     return {
         "key": raw.get("key", ""),
         "summary": raw.get("summary", ""),
+        "description": desc[:1000] if desc else "",
         "status": get_nested(raw, "status", "name") or "",
         "feature_key": extract_parent_key(raw),
         "assignee": extract_display_name(raw.get("assignee"), "Unassigned"),
         "qa_contact": extract_display_name(raw.get("customfield_10470"), "None"),
         "size": size,
-        "has_ac": has_acceptance_criteria(raw.get("description")),
+        "has_ac": has_acceptance_criteria(desc),
     }
 
 

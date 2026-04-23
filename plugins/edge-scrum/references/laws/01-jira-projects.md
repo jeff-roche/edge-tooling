@@ -8,7 +8,7 @@
 |---|---|
 | `OCPEDGE` | Primary project: all team stories, bugs, spikes, tasks, and epics |
 | `OCPBUGS` | Secondary bugs project; team owns: `Installer / Single Node OpenShift`, `Two Node with Arbiter`, `Two Node Fencing`, `Logical Volume Manager Storage` |
-| `OCPSTRAT` | Features and Initiatives for the release cycle; use label `ocpedge-plan` and filter by projects: (`OCPEDGE`, `USHIFT`) |
+| `OCPSTRAT` | Features and Initiatives for the release cycle; team ownership identified by labels `ocpedge-plan` or `microshift` |
 | `USHIFT` | MicroShift feature and bug tracking (issues rolled into board in OCPEDGE; no dedicated scrum board) |
 
 ## Labels
@@ -17,7 +17,9 @@ All team labels SHOULD use the `OCPEDGE:` namespace prefix.
 
 | Label | Usage |
 |---|---|
-| `ocpedge-plan` | Apply to Outcome, Feature, or Epic. Recursively adds labeled work to the Jira Plan (backlog). |
+| `ocpedge-plan` | Apply to Outcome, Feature, or Epic. Recursively adds labeled work to the Jira Plan (backlog). Also identifies OCPSTRAT issues as team-owned. |
+| `microshift` | Identifies OCPSTRAT issues as team-owned (MicroShift workstream). |
+| `edge` | General edge label. **Not sufficient alone** for team ownership — requires `ocpedge-plan` or `microshift` alongside it. |
 | `ocpedge` | Apply at Epic and Story level. **Only needed for work outside the OCPEDGE project.** |
 | `OCPEDGE:Docs` | Doc-specific tasks |
 | `OCPEDGE:QE` | QE-specific tasks |

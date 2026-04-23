@@ -74,15 +74,17 @@ def extract_epic_key(issue):
 
 
 def extract_parent_key(issue):
-    """Extract parent link from customfield_10018 (Epic->Feature)."""
-    raw = issue.get("customfield_10018")
-    if raw is None:
-        return "No Feature"
-    if isinstance(raw, str):
-        return raw or "No Feature"
-    if isinstance(raw, dict):
-        val = raw.get("key") or raw.get("value")
-        return val if val else "No Feature"
+    """Extract parent key from the native 'parent' field or customfield_10018."""
+    for field in ("parent", "customfield_10018"):
+        raw = issue.get(field)
+        if raw is None:
+            continue
+        if isinstance(raw, str):
+            return raw or "No Feature"
+        if isinstance(raw, dict):
+            val = raw.get("key") or raw.get("value")
+            if val:
+                return val
     return "No Feature"
 
 
@@ -109,6 +111,9 @@ def extract_display_name(field_value, fallback="None"):
     if isinstance(field_value, dict):
         if "errorMessage" in field_value:
             return "Field not configured"
+        inner = field_value.get("value")
+        if isinstance(inner, dict):
+            field_value = inner
         return (
             field_value.get("displayName")
             or field_value.get("display_name")

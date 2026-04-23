@@ -9,6 +9,21 @@ sys.path.insert(0, os.path.dirname(__file__))
 from _jira_transforms import get_nested, load_json, load_issues, write_output
 
 
+EPIC_PLANNING_STATE = "Planning"
+FEATURE_PRE_REFINED_STATES = {"New", "Refinement"}
+
+
+def epics_look_refined(epic_records):
+    """Check if a set of epics collectively appear refined.
+
+    True when every epic has moved past the Planning state, which per
+    workflow-states law means "Refinement done; ready for sprint planning."
+    """
+    if not epic_records:
+        return False
+    return all(e.get("status") != EPIC_PLANNING_STATE for e in epic_records)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Match spikes to features and produce spikes.json"
@@ -18,16 +33,21 @@ def main():
         help="Raw MCP response file(s) for refinement sprint spikes",
     )
     parser.add_argument("--features-file", required=True, help="Path to features.json")
+    parser.add_argument("--epics-file", required=True, help="Path to epics.json")
     parser.add_argument("--sprints-file", required=True, help="Path to sprints.json")
     parser.add_argument("--output", required=True, help="Output path")
     args = parser.parse_args()
 
     sprints_data = load_json(args.sprints_file)
     features_data = load_json(args.features_file)
+    epics_data = load_json(args.epics_file)
 
     ref_sprint_closed = sprints_data.get("refinement_sprint_closed", False)
     features = features_data.get("features", [])
     feature_keys = set(features_data.get("feature_keys", []))
+
+    feature_to_epics = epics_data.get("feature_to_epics", {})
+    epics_by_key = {e["key"]: e for e in epics_data.get("epics", [])}
 
     # Load and normalize ref sprint spikes
     raw_spikes = load_issues(args.input)
@@ -100,6 +120,27 @@ def main():
             s["key"] == primary for s in ref_spikes
         )
 
+        # Detect spikes linked to child epics instead of the feature
+        child_epic_keys = set(feature_to_epics.get(fk, []))
+        on_epic_keys = []
+        if primary is None and child_epic_keys:
+            for spike in ref_spikes:
+                for link in spike.get("issuelinks", []):
+                    if link.get("type", {}).get("outward") == "blocks":
+                        outward = link.get("outward_issue") or link.get("outwardIssue")
+                        if outward and outward.get("key") in child_epic_keys:
+                            on_epic_keys.append(outward["key"])
+
+        # Check if child epics collectively appear refined.
+        # If the feature itself is still in New/Refinement, its workflow state
+        # is authoritative — don't override with epic-level signals.
+        child_epics = [epics_by_key[ek] for ek in child_epic_keys if ek in epics_by_key]
+        feat_status = feat.get("status", "")
+        if feat_status in FEATURE_PRE_REFINED_STATES:
+            appear_refined = False
+        else:
+            appear_refined = epics_look_refined(child_epics)
+
         spike_map[fk] = {
             "spike_key": primary,
             "spike_keys": matched,
@@ -111,8 +152,9 @@ def main():
                 and spike_status != "Closed"
             ),
             "spike_missing": primary is None,
-            "spike_on_epic": False,
-            "spike_on_epic_keys": [],
+            "spike_on_epic": bool(on_epic_keys),
+            "spike_on_epic_keys": sorted(set(on_epic_keys)),
+            "epics_appear_refined": appear_refined,
         }
 
     # Summary
@@ -120,6 +162,11 @@ def main():
     with_spike = sum(1 for v in spike_map.values() if not v["spike_missing"])
     with_closed = sum(1 for v in spike_map.values() if v["spike_status"] == "Closed")
     missing = sum(1 for v in spike_map.values() if v["spike_missing"])
+    on_epic = sum(1 for v in spike_map.values() if v["spike_on_epic"])
+    refined_via_epics = sum(
+        1 for v in spike_map.values()
+        if v["spike_missing"] and (v["spike_on_epic"] or v["epics_appear_refined"])
+    )
 
     output = {
         "spike_map": spike_map,
@@ -128,7 +175,8 @@ def main():
             "features_with_spike": with_spike,
             "features_with_closed_spike": with_closed,
             "features_missing_spike": missing,
-            "features_spike_on_epic": 0,
+            "features_spike_on_epic": on_epic,
+            "features_refined_via_epics": refined_via_epics,
             "total_features": total,
         },
     }
