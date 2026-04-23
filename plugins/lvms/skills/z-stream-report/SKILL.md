@@ -150,7 +150,7 @@ For each supported version, calculate an urgency score (0-100):
 
 | Factor | Weight | Scoring |
 |--------|--------|---------|
-| Days since last release | 30 pts max | <30d -> 0, 30-60d -> 12, 60-90d -> 18, 90-120d -> 24, >120d -> 30 |
+| Days since last release | 30 pts max | <30d -> 0, 30-60d -> 12, 60-90d -> 18, >90d -> 30 |
 | Open CVEs | 30 pts max | 15 per Critical/Important, 8 per Moderate, 3 per Low (capped at 30) |
 | Blocker/Critical bugs | 20 pts max | 10 per Blocker, 5 per Critical (capped at 20) |
 | Major bugs | 10 pts max | 2 per Major bug (capped at 10) |
