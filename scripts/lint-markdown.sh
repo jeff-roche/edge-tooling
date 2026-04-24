@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
 # Lint modified markdown files with markdownlint
 #
 # Usage:
