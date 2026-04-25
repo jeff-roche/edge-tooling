@@ -4,7 +4,8 @@
 # Usage:
 #   Claude Code Stop hook:  piped JSON on stdin, outputs hookSpecificOutput
 #   Git pre-commit hook:    called directly, exits non-zero on lint failure
-#   Direct:                 ./scripts/lint-markdown.sh [--pre-commit]
+#   Direct:                 ./scripts/lint-markdown.sh [--pre-commit] [--fix]
+#   --fix                    pass through to markdownlint-cli2 (auto-fix where supported)
 
 set -euo pipefail
 
@@ -19,9 +20,13 @@ is_ci() {
 }
 
 PRE_COMMIT=false
-if [[ "${1:-}" == "--pre-commit" ]]; then
-    PRE_COMMIT=true
-fi
+FIX=false
+for _arg in "$@"; do
+  case "$_arg" in
+    --pre-commit) PRE_COMMIT=true ;;
+    --fix) FIX=true ;;
+  esac
+done
 
 if ! command -v npx &>/dev/null; then
     exit 0
@@ -66,12 +71,15 @@ if [ "${#FILES_TO_LINT[@]}" -eq 0 ]; then
 fi
 
 LINT_EXIT=0
+markdownlint_cli2_args=()
+[[ "$FIX" == true ]] && markdownlint_cli2_args+=(--fix)
+markdownlint_cli2_args+=("${FILES_TO_LINT[@]}")
 LINT_OUTPUT=$(npx --yes \
     -p "markdownlint-cli2@${MARKDOWNLINT_CLI2_VERSION}" \
     -p markdownlint-cli2-formatter-pretty \
     -p markdownlint-cli2-formatter-junit \
     -p markdownlint-cli2-formatter-json \
-    markdownlint-cli2 "${FILES_TO_LINT[@]}" 2>&1) || LINT_EXIT=$?
+    markdownlint-cli2 "${markdownlint_cli2_args[@]}" 2>&1) || LINT_EXIT=$?
 
 if [ "$LINT_EXIT" -eq 0 ]; then
     exit 0

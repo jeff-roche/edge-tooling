@@ -9,3 +9,6 @@ lint-markdown:
 
 lint-all-markdown:
 	scripts/lint-markdown.sh
+
+lint-fix-markdown:
+	scripts/lint-markdown.sh --pre-commit --fix
