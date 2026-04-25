@@ -1,7 +1,7 @@
 # Proposal: Slack app “Eddie” (notification webhooks)
 
 **Status:** Accepted (operational; managed in Slack API / workspace admin, not deployed from this repo)  
-**Author:** eggfoobar 
+**Author:** eggfoobar
 **Date:** 2026-04-16
 
 ## Summary

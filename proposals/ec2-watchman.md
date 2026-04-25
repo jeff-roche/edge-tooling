@@ -1,7 +1,7 @@
 # Proposal: EC2 Watchman
 
 **Status:** Accepted (operational; implementation lives in [`watchman/`](../watchman/))  
-**Author:** eggfoobar 
+**Author:** eggfoobar
 **Date:** 2026-04-16
 
 ## Summary
