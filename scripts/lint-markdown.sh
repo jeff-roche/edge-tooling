@@ -4,12 +4,15 @@
 # Usage:
 #   Claude Code Stop hook:  piped JSON on stdin, outputs hookSpecificOutput
 #   Git pre-commit hook:    called directly, exits non-zero on lint failure
-#   Direct:                 ./scripts/lint-markdown.sh [--pre-commit]
+#   Direct:                 ./scripts/lint-markdown.sh [--pre-commit] [--fix]
+#   --fix                    pass through to markdownlint-cli2 (auto-fix where supported)
+#   --check-all-files        lint all markdown files in the repo
+#   BASE_REF                 optional; default main — used for git diff file lists
+#   ARTIFACT_DIR             CI only (provided by runner); junit/json copied here before cleanup
 
 set -euo pipefail
 
 MARKDOWNLINT_CLI2_VERSION="${MARKDOWNLINT_CLI2_VERSION:-0.22.1}"
-
 
 is_ci() {
   case "${OPENSHIFT_CI:-}" in
@@ -19,9 +22,15 @@ is_ci() {
 }
 
 PRE_COMMIT=false
-if [[ "${1:-}" == "--pre-commit" ]]; then
-    PRE_COMMIT=true
-fi
+FIX=false
+CHECK_ALL_FILES=false
+for _arg in "$@"; do
+  case "$_arg" in
+    --pre-commit) PRE_COMMIT=true ;;
+    --fix) FIX=true ;;
+    --check-all-files) CHECK_ALL_FILES=true ;;
+  esac
+done
 
 if ! command -v npx &>/dev/null; then
     exit 0
@@ -44,34 +53,98 @@ fi
 
 cd "$CWD"
 
+# CI often runs with a non-writable HOME (e.g. "/"), so pin npm cache to /tmp.
+# Run markdownlint from /tmp in CI so formatter outputs are writable; pass
+# --config "${CWD}/.markdownlint-cli2.jsonc" so rules/formatters load from the repo.
+RUN_CWD="$CWD"
+if is_ci; then
+    export NPM_CONFIG_CACHE="${NPM_CONFIG_CACHE:-${TMPDIR:-/tmp}/npm-cache-${UID:-ci}}"
+    mkdir -p "$NPM_CONFIG_CACHE"
+    RUN_CWD="$(mktemp -d "${TMPDIR:-/tmp}/markdownlint-ci.XXXXXX")"
+fi
+
+# shellcheck disable=SC2329 # Invoked via trap.
+cleanup() {
+    rm -f "${CWD}/markdownlint-cli2-junit.xml" "${CWD}/markdownlint-cli2-results.json"
+    if is_ci; then
+        cp -f "${RUN_CWD}/markdownlint-cli2-junit.xml" "${ARTIFACT_DIR}/"
+        cp -f "${RUN_CWD}/markdownlint-cli2-results.json" "${ARTIFACT_DIR}/"
+        rm -rf "$RUN_CWD"
+    fi
+}
+trap cleanup EXIT
+
+# Resolve BASE_REF (default: main) to an existing ref for git diff.
+resolve_base_ref() {
+    local preferred="${BASE_REF:-main}"
+    local candidate
+    for candidate in "$preferred" "origin/${preferred}" "origin/main" "main" "HEAD"; do
+        if git rev-parse --verify --quiet "${candidate}^{commit}" &>/dev/null; then
+            printf '%s' "$candidate"
+            return 0
+        fi
+    done
+    printf 'HEAD'
+}
+
+# Resolve best diff base for CI merge jobs.
+resolve_ci_diff_base() {
+    if [[ -n "${PULL_BASE_SHA:-}" ]] && git rev-parse --verify --quiet "${PULL_BASE_SHA}^{commit}" &>/dev/null; then
+        printf '%s' "${PULL_BASE_SHA}"
+        return 0
+    fi
+    if git rev-parse --verify --quiet "HEAD^1" &>/dev/null; then
+        printf 'HEAD^1'
+        return 0
+    fi
+    resolve_base_ref
+}
+
 # Find .md files to lint based on context
-if [ "$PRE_COMMIT" = true ]; then
-    ALL_FILES=$(git diff --cached --name-only --diff-filter=ACM -- '*.md' 2>/dev/null || true)
-else
+ALL_FILES=""
+if [[ "$CHECK_ALL_FILES" == true ]]; then
     ALL_FILES="**/*.md"
+elif [[ "$FIX" == true ]]; then
+    # Include unstaged + staged vs BASE_REF (no --cached).
+    ALL_FILES=$(git diff "$(resolve_base_ref)" --name-only --diff-filter=ACM -- '*.md' 2>/dev/null || true)
+elif is_ci; then
+    # Direct CI run without --pre-commit.
+    ALL_FILES=$(git diff "$(resolve_ci_diff_base)" --name-only --diff-filter=ACM -- '*.md' 2>/dev/null || true)
+elif [[ "$PRE_COMMIT" == true ]]; then
+    # Local hook: index-only (staged).
+    ALL_FILES=$(git diff --cached --name-only --diff-filter=ACM -- '*.md' 2>/dev/null || true)
 fi
 
 if [ -z "$ALL_FILES" ]; then
+    echo "No files to lint"
     exit 0
 fi
 
 # Filter to files that exist (use array for safe handling of special characters)
 FILES_TO_LINT=()
 while IFS= read -r file; do
+    [[ -z "$file" ]] && continue
+    if is_ci && [[ "$file" != /* ]]; then
+        file="${CWD}/${file}"
+    fi
     FILES_TO_LINT+=("$file")
 done <<< "$ALL_FILES"
 
-if [ "${#FILES_TO_LINT[@]}" -eq 0 ]; then
-    exit 0
-fi
+echo "Linting files"
 
 LINT_EXIT=0
-LINT_OUTPUT=$(npx --yes \
+markdownlint_cli2_args=()
+[[ "$FIX" == true ]] && markdownlint_cli2_args+=(--fix)
+if is_ci && [[ -f "${CWD}/.markdownlint-cli2.jsonc" ]]; then
+    markdownlint_cli2_args+=(--config "${CWD}/.markdownlint-cli2.jsonc")
+fi
+markdownlint_cli2_args+=("${FILES_TO_LINT[@]}")
+LINT_OUTPUT=$(cd "$RUN_CWD" && npx --yes \
     -p "markdownlint-cli2@${MARKDOWNLINT_CLI2_VERSION}" \
     -p markdownlint-cli2-formatter-pretty \
     -p markdownlint-cli2-formatter-junit \
     -p markdownlint-cli2-formatter-json \
-    markdownlint-cli2 "${FILES_TO_LINT[@]}" 2>&1) || LINT_EXIT=$?
+    markdownlint-cli2 "${markdownlint_cli2_args[@]}" 2>&1) || LINT_EXIT=$?
 
 if [ "$LINT_EXIT" -eq 0 ]; then
     exit 0
@@ -96,8 +169,5 @@ if command -v jq &>/dev/null; then
         jq -cn --arg lint "$LINT_OUTPUT" --arg msg "$CONTEXT_MSG" '{hookSpecificOutput:{hookEventName:"Stop",errors:{cliOutput:$lint},additionalContext:$msg}}'
     fi
 fi
-
-# Clean up temporary files after claude is done, keep them if failure happens when user is running or is in CI.
-rm -f markdownlint-cli2-junit.xml markdownlint-cli2-results.json
 
 exit 0
