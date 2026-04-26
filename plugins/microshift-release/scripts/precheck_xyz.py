@@ -191,8 +191,12 @@ def compute_recommendation(evaluation):
     # 90-day rule (hard policy constraint — evaluated before OCPBUGS labels)
     if days_since is not None and days_since >= 90 and commits > 0:
         if not ocp_available:
-            return "NEEDS REVIEW", f"90-day rule ({days_since}d, {commits} commits) — OCP payload not yet available"
-        return "ASK ART TO CREATE ARTIFACTS", f"90-day rule ({days_since}d since last release, {commits} commits)"
+            return ("NEEDS REVIEW",
+                    f"90-day rule ({days_since}d, {commits} commits)"
+                    " — OCP payload not yet available")
+        return ("ASK ART TO CREATE ARTIFACTS",
+                f"90-day rule ({days_since}d since last release,"
+                f" {commits} commits)")
 
     # Resolved OCPBUGS targeting this version
     ocpbugs_data = evaluation.get("ocpbugs", {})
@@ -225,7 +229,9 @@ def compute_recommendation(evaluation):
 
     # Skip: no changes
     if commits == 0:
-        days_str = f"{days_since}d since last release" if days_since is not None else "unknown last release"
+        days_str = (f"{days_since}d since last release"
+                    if days_since is not None
+                    else "unknown last release")
         return "SKIP", f"No commits ({days_str})"
 
     # Has commits but no CVEs and within 90 days
@@ -233,6 +239,47 @@ def compute_recommendation(evaluation):
         return "SKIP", f"{days_since}d since last release, {commits} commits, no CVEs"
 
     return "SKIP", f"{commits} commits, no CVEs"
+
+
+def _resolve_range_base(version, minor, z):
+    """Resolve the git range base for counting commits since a release.
+
+    Tries three strategies in order:
+    1. Exact git tag for the version.
+    2. Brew NVR commit hash (embedded in the RPM build metadata).
+    3. Nearest previous z-stream tag.
+
+    Args:
+        version: Published version string, e.g., "4.21.11".
+        minor: Minor version, e.g., "4.21".
+        z: Z-stream number of the published version.
+
+    Returns:
+        tuple[str|None, str|None]: (since_version, since_commit).
+            Exactly one will be set, or both None if nothing found.
+    """
+    # Strategy 1: exact tag
+    if git_ops.find_version_tag(version):
+        return version, None
+
+    # Strategy 2: Brew NVR commit hash
+    logger.warning("Git tag not found for %s, trying Brew NVR...", version)
+    commit = brew.extract_commit_from_nvr(version)
+    if commit and git_ops.verify_commit_exists(commit):
+        logger.info("Using Brew commit %s for %s", commit, version)
+        return None, commit
+    if commit:
+        logger.warning("Brew commit %s for %s not found in local clone",
+                       commit, version)
+
+    # Strategy 3: nearest previous tag
+    logger.warning("Brew commit not found, searching for nearest tag...")
+    nearest_ver, _ = git_ops.find_nearest_version_tag(minor, z - 1)
+    if nearest_ver:
+        logger.info("Using nearest available tag: %s", nearest_ver)
+        return nearest_ver, None
+
+    return None, None
 
 
 def evaluate_version(version, lifecycle_data, repo_root):
@@ -256,6 +303,18 @@ def evaluate_version(version, lifecycle_data, repo_root):
         result["lifecycle_end_date"] = lc.get("end_date", "")
     else:
         result["lifecycle_status"] = "unknown"
+
+    # Skip EOL versions immediately
+    if result["lifecycle_status"] == "End of life":
+        result["recommendation"] = "SKIP"
+        result["reason"] = "End of life"
+        return result
+
+    # VPN check — required for Brew and advisory report access
+    if not brew.check_vpn():
+        result["recommendation"] = "NEEDS REVIEW"
+        result["reason"] = "VPN not connected"
+        return result
 
     # Already released check (Pyxis)
     logger.info("Checking if %s is already released...", version)
@@ -301,22 +360,25 @@ def evaluate_version(version, lifecycle_data, repo_root):
     logger.info("Fetching commits on %s...", branch)
     git_ops.fetch_branch(branch)
 
-    last_pub = pyxis.find_latest_published_zstream(minor)
+    last_pub = pyxis.find_latest_published_zstream_any(minor)
     if last_pub:
         result["last_released"] = last_pub["version"]
-        since_version = last_pub["version"]
+        since_version, since_commit = _resolve_range_base(
+            last_pub["version"], minor, last_pub["z"])
     else:
         result["last_released"] = f"{minor}.0"
-        since_version = None
+        since_version, since_commit = None, None
 
-    commit_list = git_ops.commits_since(branch, since_version)
+    commit_list = git_ops.commits_since(branch, since_version, since_commit=since_commit)
     result["commits"] = len(commit_list)
     result["commit_list"] = commit_list
 
     # 4b: OCPBUGS resolved bugs (fixVersion + commit message references)
     logger.info("Checking resolved OCPBUGS for %s...", version)
     try:
-        result["ocpbugs"] = ocpbugs.query_resolved_bugs(version, branch, since_version)
+        result["ocpbugs"] = ocpbugs.query_resolved_bugs(
+            version, branch, since_version, since_commit=since_commit,
+        )
     except Exception as e:
         logger.warning("OCPBUGS check failed for %s: %s", version, e)
         result["ocpbugs"] = {"count": 0, "bugs": [], "skipped": True}
@@ -330,12 +392,23 @@ def evaluate_version(version, lifecycle_data, repo_root):
     # 4e: 90-day rule — get date of last release from git tags
     if last_pub:
         release_date = git_ops.get_release_date(last_pub["version"])
+        if not release_date and last_pub.get("date"):
+            release_date = last_pub["date"]
+            logger.info("Using errata date for %s: %s",
+                        last_pub["version"], release_date)
+        if not release_date:
+            logger.info("Git tag/errata date not found for %s, "
+                        "trying Pyxis...", last_pub["version"])
+            release_date = pyxis.get_publish_date(last_pub["version"])
         if release_date:
             try:
                 build_date = datetime.strptime(release_date, "%Y-%m-%d")
                 result["days_since"] = (datetime.now() - build_date).days
                 result["last_release_date"] = release_date
-            except (ValueError, TypeError):
+            except (ValueError, TypeError) as e:
+                logger.warning("Failed to parse release date '%s' "
+                               "for %s: %s",
+                               release_date, last_pub["version"], e)
                 result["days_since"] = None
         else:
             result["days_since"] = None
@@ -455,6 +528,16 @@ def format_text_short(evaluations):
             lines.append(f"{rec:<{REC_WIDTH}} {version}")
             continue
 
+        if e.get("lifecycle_status") == "End of life":
+            lines.append(f"{rec:<{REC_WIDTH}} {version} [End of life]")
+            continue
+
+        if e.get("reason") == "VPN not connected":
+            lines.append(
+                f"{rec:<{REC_WIDTH}} {version}"
+                " [VPN not connected]")
+            continue
+
         # OCP status
         ocp = e.get("ocp_status", "")
         if ocp == "available":
@@ -512,7 +595,8 @@ def format_text_full(output):
         commits = str(e.get("commits", 0))
         impact = e.get("cve_impact", {}).get("impact", "--")
         ocpbugs_data = e.get("ocpbugs", {})
-        ocpbugs_count = "skipped" if ocpbugs_data.get("skipped") else str(ocpbugs_data.get("count", 0))
+        ocpbugs_count = ("skipped" if ocpbugs_data.get("skipped")
+                         else str(ocpbugs_data.get("count", 0)))
         sections.append(f"| {v} | {last} | {days} | {commits} | {impact} | {ocpbugs_count} |")
 
     # Advisory Report table
@@ -541,7 +625,9 @@ def format_text_full(output):
                     for cve_id, cve_data in cves.items():
                         jira_ticket = cve_data.get("jira_ticket")
                         if jira_ticket:
-                            impact = f"{jira_ticket.get('id', '?')} ({jira_ticket.get('resolution', '?')})"
+                            jid = jira_ticket.get('id', '?')
+                            jres = jira_ticket.get('resolution', '?')
+                            impact = f"{jid} ({jres})"
                         else:
                             impact = "not affected"
                         sections.append(f"| {v} | {adv_name} | {adv_type} | {cve_id} | {impact} |")

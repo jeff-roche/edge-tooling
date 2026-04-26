@@ -5,7 +5,7 @@ import re
 import subprocess
 
 from lib.art_jira import create_jira_client, _sanitize_jql_value
-from lib.git_ops import ensure_microshift_repo, find_version_tag
+from lib.git_ops import ensure_microshift_repo, build_revision_range
 
 logger = logging.getLogger(__name__)
 
@@ -14,10 +14,13 @@ _OCPBUGS_RE = re.compile(r"OCPBUGS-\d+")
 _RELEASE_NOTE_TEXT = "customfield_10783"     # Free-text release note content
 _RELEASE_NOTE_TYPE = "customfield_10785"     # Type: "Rebase", "Release Note Not Required", etc.
 _RELEASE_NOTE_STATUS = "customfield_10807"   # Status: "Done", "In Progress", "Not Required", etc.
-_JIRA_FIELDS = f"summary,status,labels,{_RELEASE_NOTE_TEXT},{_RELEASE_NOTE_TYPE},{_RELEASE_NOTE_STATUS}"
+_JIRA_FIELDS = (
+    f"summary,status,labels,"
+    f"{_RELEASE_NOTE_TEXT},{_RELEASE_NOTE_TYPE},{_RELEASE_NOTE_STATUS}"
+)
 
 
-def extract_bugs_from_commits(branch, since_version):
+def extract_bugs_from_commits(branch, since_version, since_commit=None):
     """Extract OCPBUGS references from commit messages since a version.
 
     Scans the full commit message (subject + body) for OCPBUGS-XXXXX patterns.
@@ -25,12 +28,13 @@ def extract_bugs_from_commits(branch, since_version):
     Args:
         branch: Branch name, e.g., "release-4.21".
         since_version: Version string, e.g., "4.18.36", or None.
+        since_commit: Git commit hash to use as range base when the
+            version tag is unavailable.
 
     Returns:
         set[str]: Unique OCPBUGS keys found in commits, e.g., {"OCPBUGS-12345"}.
     """
-    tag = find_version_tag(since_version) if since_version else None
-    revision = f"{tag}..origin/{branch}" if tag else f"origin/{branch}"
+    revision = build_revision_range(branch, since_version, since_commit)
 
     repo = ensure_microshift_repo()
     try:
@@ -133,7 +137,8 @@ def _issue_to_dict(issue, source):
     }
 
 
-def query_resolved_bugs(version, branch=None, since_version=None):
+def query_resolved_bugs(version, branch=None, since_version=None,
+                        since_commit=None):
     """Query OCPBUGS for resolved MicroShift bugs from two sources.
 
     1. Jira fixVersion query: bugs explicitly targeting this z-stream.
@@ -147,6 +152,8 @@ def query_resolved_bugs(version, branch=None, since_version=None):
         version: Full version, e.g., "4.21.8".
         branch: Branch name for commit scanning, e.g., "release-4.21".
         since_version: Last released version for commit range, or None.
+        since_commit: Git commit hash to use as range base when the
+            version tag is unavailable.
 
     Returns:
         dict: {"count": int, "bugs": list[dict], "skipped": bool, "error": str|None}
@@ -158,7 +165,9 @@ def query_resolved_bugs(version, branch=None, since_version=None):
     # Extract OCPBUGS from commits (only when Jira lookups can run)
     commit_bug_keys = set()
     if branch:
-        commit_bug_keys = extract_bugs_from_commits(branch, since_version)
+        commit_bug_keys = extract_bugs_from_commits(
+            branch, since_version, since_commit=since_commit,
+        )
         if commit_bug_keys:
             logger.info("Found %d OCPBUGS references in commits: %s",
                         len(commit_bug_keys), ", ".join(sorted(commit_bug_keys)))
