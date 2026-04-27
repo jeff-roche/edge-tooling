@@ -1,7 +1,9 @@
 #!/bin/bash
-# Git pre-commit hook — validates staged markdown files with markdownlint-cli2
+set -euo pipefail
+# Git pre-commit hook
 #
 # Install shared hooks from the repo root: make setup-githooks
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-exec "$REPO_ROOT/scripts/lint-markdown.sh" --pre-commit
+"$REPO_ROOT/scripts/lint-markdown.sh" --pre-commit
+"$REPO_ROOT/scripts/sync-plugin-skills.sh" --verify
