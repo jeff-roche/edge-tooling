@@ -56,19 +56,7 @@ Substituted by the parent before spawning:
 
 ---
 
-### 2. Detect Misplaced Spikes
-
-For each feature where `spike_missing = true` in `spikes.json`:
-
-1. Get that feature's child epic keys from `epics.json` (`feature_to_epics[feature_key]`)
-2. Check `all_ref_sprint_spikes` — for each spike, scan its `issuelinks` for a `"blocks"` link targeting one of those epic keys
-3. If found: mark `spike_map[feature_key].spike_on_epic = true`, set `spike_on_epic_keys` to the matching epic keys
-
-Update the `features_spike_on_epic` count in memory (do not rewrite `spikes.json`).
-
----
-
-### 3. Fetch Child Issues
+### 2. Fetch Child Issues
 
 Split `epic_keys_csv` from `epics.json` into batches of ~20. For each batch, paginate with `page_token`, `limit=50` until all results are fetched:
 
@@ -103,7 +91,7 @@ Per issue, compute:
 
 ---
 
-### 4. Build Hierarchy and Rollups
+### 3. Build Hierarchy and Rollups
 
 Group: Feature → Epics → Issues.
 Orphan groups: `(No Feature)`, `(No Epic)`, `(Unlinked Bugs)`.
@@ -138,6 +126,20 @@ Orphan groups: `(No Feature)`, `(No Epic)`, `(Unlinked Bugs)`.
 
 ---
 
+### 4. Refinement Reassessment
+
+After building the hierarchy, reassess `epics_appear_refined` for features that the transform did not already mark as refined. For each feature where `spike_missing = true` AND `spike_on_epic = false` AND `epics_appear_refined = false` AND feature status is not "New" or "Refinement":
+
+1. Get the feature's child epics from the hierarchy
+2. Skip features with 0 epics — they cannot be refined via epics
+3. For each epic, read its `description` (from `epics.json`) and examine the child stories/tasks created under it (from the hierarchy)
+4. An epic looks refined if its description describes work to be done AND the existing child stories appear to cover that described work — the stories don't need to be complete, but they should exist and address the scope outlined in the description
+5. If **all** of the feature's epics look refined by this assessment, override `epics_appear_refined = true` for that feature
+
+Update `features_refined_via_epics` count accordingly.
+
+---
+
 ### 5. Risk Assessment
 
 Read `refinement_sprint_closed` from `sprints.json`.
@@ -166,19 +168,17 @@ If `refinement_sprint_closed = true`, per Feature:
 
 **7c — Refinement — Spike Rules** (based on `refinement_sprint_closed`):
 
-If `refinement_sprint_closed = false`:
+Evaluate in this order — first match wins:
 
-- `spike_missing` AND NOT `spike_on_epic` → 🔴 "No refinement spike — SME must create one in Sprint {REFINEMENT_SPRINT_NUM} that blocks this Feature"
-- `spike_missing` AND `spike_on_epic` → 🟡 "Spike linked to child Epic — relink so it blocks the Feature directly"
-- spike exists AND NOT `spike_in_ref_sprint` → 🟡 "Spike not in refinement sprint — move to Sprint {REFINEMENT_SPRINT_NUM}"
-- spike exists AND `spike_in_ref_sprint` AND status ≠ Closed → 🟢 "Spike in progress (expected)"
-
-If `refinement_sprint_closed = true`:
-
-- `spike_overdue = true` → 🔴 "Refinement spike not closed — refinement incomplete"
-- `spike_missing` AND NOT `spike_on_epic` → 🔴 "No refinement spike found; delivery epics may be under-refined"
-- `spike_missing` AND `spike_on_epic` → 🟡 "Spike linked to child Epic — relink for correct tracking"
-- `spike_status = "Closed"` → ✅ No risk
+1. `spike_status = "Closed"` → ✅ "Closed" — direct spike completed, no risk
+2. `spike_missing` AND (`spike_on_epic = true` OR `epics_appear_refined = true`) → ✅ "Via epics" — no spike risk
+3. If `refinement_sprint_closed = false`:
+   - `spike_missing` → 🔴 "No refinement spike — SME must create one in Sprint {REFINEMENT_SPRINT_NUM} that blocks this Feature"
+   - spike exists AND NOT `spike_in_ref_sprint` → 🟡 "Spike not in refinement sprint — move to Sprint {REFINEMENT_SPRINT_NUM}"
+   - spike exists AND `spike_in_ref_sprint` AND status ≠ Closed → 🟢 "Spike in progress (expected)"
+4. If `refinement_sprint_closed = true`:
+   - `spike_overdue = true` → 🔴 "Refinement spike not closed — refinement incomplete"
+   - `spike_missing` → 🔴 "No refinement spike found; delivery epics may be under-refined"
 
 **7c — Refinement — General:**
 
@@ -204,8 +204,8 @@ If `refinement_sprint_closed = true`:
 - XL-sized epic AND `remaining_sprint_count ≤ 2` → 🔴 "XL-sized epic unlikely to complete"
 - L-sized epic AND `remaining_sprint_count ≤ 1` → 🔴 "L-sized epic at risk"
 - `total_remaining_sp > max_sp_capacity` → 🔴 "Capacity risk"
-- (if `refinement_sprint_closed`) `features_missing_spike / total_features > 0.5` → 🔴 "Systematic refinement gap"
-- (if `refinement_sprint_closed`) `features_with_closed_spike / total_features < 0.75` → 🟡 "Refinement coverage below 75%"
+- (if `refinement_sprint_closed` AND `total_features > 0`) `(features_missing_spike - features_refined_via_epics) / total_features > 0.5` → 🔴 "Systematic refinement gap"
+- (if `refinement_sprint_closed` AND `total_features > 0`) `(features_with_closed_spike + features_refined_via_epics) / total_features < 0.75` → 🟡 "Refinement coverage below 75%"
 
 ---
 
@@ -230,6 +230,7 @@ Write to `{WORKDIR}/analysis.md` with this exact sentinel structure:
   "features_with_closed_spike": <int>,
   "features_missing_spike": <int>,
   "features_spike_on_epic": <int>,
+  "features_refined_via_epics": <int>,
   "remaining_sp": <int>,
   "max_sp_capacity": <int>,
   "capacity_risk": <bool>,
@@ -239,20 +240,20 @@ Write to `{WORKDIR}/analysis.md` with this exact sentinel structure:
 ===END_META===
 
 ===SECTION:DASHBOARD===
-| Feature/Initiative | Type | SME | QA | Size | Refn Spike | Epics Done | Progress | Risk |
-|---|---|---|---|---|---|---|---|---|
-(one row per feature, sorted 🔴 first then 🟡 then 🟢 then ✅)
-Spike column: ✅ Closed | 🔄 In Progress | ⚠️ Missing | ⏳ Open | 🔀 On Epic
+| Key | Feature/Initiative | Type | Status | SME | QA | Size | Refn Spike | Epics Done | Progress | Risk |
+|---|---|---|---|---|---|---|---|---|---|---|
+(one row per feature, sorted by Jira rank — preserve the priority order returned by the JQL query)
+Spike column: ✅ Closed | ✅ Via epics | 🔄 In Progress | ⚠️ Missing | ⏳ Open
 ===END_SECTION===
 
 ===SECTION:FEATURE_DETAIL===
-(one subsection per feature, sorted 🔴 first)
+(one subsection per feature, sorted by Jira rank — same order as the dashboard)
 
 ### OCPSTRAT-XXX: {Summary}
 
 **Type**: {type} | **Status**: {status} | **Health**: {emoji}
 **SME**: {sme} | **QA**: {qa_contact} | **Docs**: {docs_approver}
-**Refinement Spike**: {spike_key — ✅ Closed | 🔄 In Progress | ⚠️ Missing | ⏳ Open | 🔀 On Epic {epic_key}}
+**Refinement Spike**: {spike_key — ✅ Closed | ✅ Via epics | 🔄 In Progress | ⚠️ Missing | ⏳ Open}
 **Progress**: {done_sp}/{total_sp} SP ({pct}%) — {done_epics}/{epic_count} epics complete
 **Refinement**: {✅ Has AC | ⚠️ Needs AC} | **Sized**: {✅ | ⚠️ Unsized}
 

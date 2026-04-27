@@ -14,5 +14,6 @@
 | Doc Contact | `customfield_10473` | User picker | Documentation owner for an issue |
 | SME | `customfield_10475` | User picker | Subject Matter Expert for a Feature/Initiative |
 | T-shirt Size | `customfield_10795` | String | Size (XS/S/M/L/XL) for Features and Initiatives |
+| Target Version | `customfield_10855` | Multi-version picker | Release targeting for Features/Initiatives; values use format `openshift-{X.Y}` |
 
 Agents MUST use these exact field IDs when constructing Jira API calls. Never hardcode field names as strings in JQL — use the `customfield_` ID.

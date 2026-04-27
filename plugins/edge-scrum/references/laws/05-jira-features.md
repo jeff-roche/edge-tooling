@@ -36,6 +36,6 @@ Features in **New** state are **not a commitment** of work.
 
 Features SHOULD only contain epics that are **required** for the feature to complete. Optional or nice-to-have epics belong in an Initiative or as standalone epics.
 
-Features and Initiatives live in the `OCPSTRAT` project. Apply label `ocpedge-plan` to include them in the Jira Plan.
+Features and Initiatives live in the `OCPSTRAT` project. A Feature/Initiative belongs to the team when it has the label `ocpedge-plan` or `microshift`. The `edge` label alone is not sufficient — it must be paired with one of these.
 
-Features are planned for a release cycle using labels with the format `{X.Y_version}-candidate`.
+A Feature/Initiative is targeted for a release by its **Target Version** (`customfield_10855`), which must include `openshift-{X.Y}` (e.g., `openshift-5.0`).

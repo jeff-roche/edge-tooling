@@ -24,3 +24,15 @@ The **SME** role is responsible for feature refinement. Assigned during release 
 4. **After spike:** Create deliverable Epics. Leave a comment on the Feature/Initiative indicating it's ready to move to "Backlog" state.
 
 **Important:** Features SHOULD only contain epics that are **required** for the feature to complete. Optional or nice-to-have epics belong in an Initiative or as standalone epics.
+
+## Implicit Refinement via Epics
+
+A Feature with no child epics is considered **not refined** — there is no epic-level signal to assess. A Feature MAY be considered refined without a direct refinement spike when any of the following hold:
+
+1. **Spike on epic**: A refinement spike in the refinement sprint blocks one of the Feature's child epics (rather than the Feature itself).
+2. **Epics past Planning**: All child epics have moved past the **Planning** state, indicating that refinement happened at the epic level without a formal spike.
+3. **Stories cover described work**: Each child epic's description outlines work to be done and the child stories/tasks already created under it appear to cover that described scope. This is an LLM-assessed judgment, not a mechanical check.
+
+In all cases, agents SHOULD treat the Feature as refined (no spike-related risk). The preferred process is still to create a spike that blocks the Feature directly, but these alternatives are recognized as valid evidence of completed refinement.
+
+**Exception:** If the Feature's own status is **New** or **Refinement**, these implicit signals do not apply. The Feature's workflow state is authoritative — a Feature explicitly in Refinement is not refined regardless of its epics' state.
