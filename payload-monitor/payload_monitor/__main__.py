@@ -236,6 +236,7 @@ def main(
         data_errors=data_errors,
         recurring_threshold=config.recurring_threshold,
         persistent_threshold=config.persistent_threshold,
+        payloads_per_stream=config.payloads_per_stream,
     )
 
     # Step 4: Analyze and find JIRA matches
