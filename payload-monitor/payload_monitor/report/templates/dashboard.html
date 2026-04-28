@@ -94,7 +94,7 @@
 {% if report.payloads_per_stream < report.persistent_threshold %}
 <div class="warning-banner">
   <strong>Note:</strong> Analyzing only {{ report.payloads_per_stream }} payload{{ 's' if report.payloads_per_stream != 1 else '' }} per stream —
-  {% if report.payloads_per_stream < report.recurring_threshold %}Recurring, {% endif %}Persistent and Unstable failure labels require more payloads to appear.
+  {% if report.payloads_per_stream < report.recurring_threshold %}Recurring, {% endif %}Persistent{% if report.payloads_per_stream < 3 %} and Unstable{% endif %} failure labels require more payloads to appear.
 </div>
 {% endif %}
 

@@ -14,6 +14,7 @@ You are helping a developer monitor OpenShift nightly payload health for edge to
 This skill composes with the following installed marketplace CI skills from the [ai-helpers](https://github.com/openshift-eng/ai-helpers) repository. These are used automatically for blocking job analysis:
 
 ### Data Fetching Skills
+
 | Skill | When to Use |
 |-------|-------------|
 | `ci:fetch-payloads` | Fetch recent release payloads from the release controller — use as a cross-check or when the Python tool's data needs supplementation |
@@ -27,6 +28,7 @@ This skill composes with the following installed marketplace CI skills from the 
 | `ci:fetch-test-runs` | Fetch test runs from Sippy including outputs for AI similarity analysis — use to compare failure patterns |
 
 ### Deep Analysis Skills
+
 | Skill | When to Use |
 |-------|-------------|
 | `ci:analyze-payload` | Full payload analysis with historical lookback and HTML report — use for rejected/failing payloads with edge blockers |
@@ -39,6 +41,7 @@ This skill composes with the following installed marketplace CI skills from the 
 | `ci:check-if-jira-regression-is-ongoing` | Check if a JIRA regression bug is still ongoing or resolved — use to validate whether known bugs still apply |
 
 ### Action Skills
+
 | Skill | When to Use |
 |-------|-------------|
 | `ci:trigger-payload-job` | Trigger payload testing on a PR — use to verify a fix resolves the payload failure |
@@ -83,11 +86,13 @@ cd "$TOOL_DIR" && .venv/bin/python -m payload_monitor --output reports/report-$(
 Pass through any relevant flags (`--versions`, `--payloads`, `--skip-prow`, `--skip-sippy`, `--with-timing`).
 
 **Important:** If a report with the same filename already exists, the tool automatically appends a timestamp (e.g., `report-2026-03-25-143027.html`). Capture the actual output path from the tool's log line:
+
 - `Report: /path/to/report-{name}.html`
 
 Use this actual path (not the hardcoded date-based name) in all subsequent steps.
 
 The tool outputs:
+
 - An HTML report (self-contained interactive dashboard)
 - Blocking job summary printed to stdout (pipe-delimited lines between `BLOCKING_JOBS_START` and `BLOCKING_JOBS_END` markers)
 
@@ -95,7 +100,7 @@ The tool outputs:
 
 Parse the blocking job lines from the tool's stdout. Each line between the markers has the format:
 
-```
+```text
 BLOCKING|job_name|prow_url|topology|version|payload_tag
 ```
 
@@ -107,7 +112,7 @@ If no `BLOCKING_JOBS_START` marker appears in the output, there are no blocking 
 
 Use the following prompt for each blocking job. When there is **exactly 1 blocking failure**, run it directly in the main agent (no subagent). When there are **2 or more blocking failures**, spawn one subagent per job using the Agent tool, all in parallel — this significantly reduces wall-clock time.
 
-```
+```text
 Analyze this failing blocking edge job and return a JSON deep_analysis object.
 
 Job: {job_name}
@@ -146,6 +151,7 @@ When using subagents, launch all in parallel using multiple Agent tool calls in 
 **Subagent configuration:** When spawning subagents, set a timeout of 5 minutes per agent. If a subagent times out or returns an error:
 
 1. Record the failure in the analysis JSON with a descriptive error:
+
    ```json
    {
      "prow_url": "{prow_url}",
@@ -156,6 +162,7 @@ When using subagents, launch all in parallel using multiple Agent tool calls in 
      "recommendation": "Run /ci:prow-job-analyze-test-failure {prow_url} manually for detailed analysis"
    }
    ```
+
 2. Continue with results from other subagents — do NOT discard partial results.
 3. Include a note in the final output indicating which jobs could not be analyzed.
 
@@ -207,7 +214,7 @@ This file has served its purpose — the analysis is now embedded in the HTML re
 
 Do NOT duplicate the report data or findings summary — the HTML dashboard already contains all of that. Present only a brief confirmation:
 
-```
+```text
 ## Edge OCP Payload Monitor Report Generated
 
 Report: `<actual report path captured from Step 3>`
@@ -219,6 +226,7 @@ Open the HTML report for the full interactive dashboard with findings summary, s
 Use the actual report file path captured from the tool's `Report:` log line in Step 3 — do NOT hardcode a date-based path.
 
 Offer follow-up actions the user can take from this session:
+
 - **Create JIRA bugs** for untracked failures
 - **Set release blocker** on a JIRA issue (`ci:set-release-blocker`)
 - **Triage a regression** in Component Readiness (`ci:triage-regression`)

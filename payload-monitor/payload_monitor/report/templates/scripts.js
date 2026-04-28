@@ -511,8 +511,12 @@ document.addEventListener('DOMContentLoaded', function() {
     tip.textContent = el.dataset.tip;
     tip.style.display = '';
     var r = el.getBoundingClientRect();
-    tip.style.left = (r.left + r.width / 2 - tip.offsetWidth / 2 + window.scrollX) + 'px';
-    tip.style.top = (r.top - tip.offsetHeight - 6 + window.scrollY) + 'px';
+    var x = r.left + r.width / 2 - tip.offsetWidth / 2;
+    var y = r.top - tip.offsetHeight - 6;
+    x = Math.max(4, Math.min(x, window.innerWidth - tip.offsetWidth - 4));
+    y = Math.max(4, Math.min(y, window.innerHeight - tip.offsetHeight - 4));
+    tip.style.left = (x + window.scrollX) + 'px';
+    tip.style.top = (y + window.scrollY) + 'px';
   });
   document.addEventListener('mouseout', function(e) {
     if (e.target.closest('.svg-tip')) tip.style.display = 'none';
