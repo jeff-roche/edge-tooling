@@ -498,3 +498,23 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 });
+
+/* SVG chart tooltips (data-tip attribute on .svg-tip circles) */
+(function() {
+  var tip = document.createElement('div');
+  tip.className = 'svg-tooltip';
+  tip.style.display = 'none';
+  document.body.appendChild(tip);
+  document.addEventListener('mouseover', function(e) {
+    var el = e.target.closest('.svg-tip');
+    if (!el || !el.dataset.tip) return;
+    tip.textContent = el.dataset.tip;
+    tip.style.display = '';
+    var r = el.getBoundingClientRect();
+    tip.style.left = (r.left + r.width / 2 - tip.offsetWidth / 2 + window.scrollX) + 'px';
+    tip.style.top = (r.top - tip.offsetHeight - 6 + window.scrollY) + 'px';
+  });
+  document.addEventListener('mouseout', function(e) {
+    if (e.target.closest('.svg-tip')) tip.style.display = 'none';
+  });
+})();

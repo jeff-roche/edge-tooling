@@ -1066,7 +1066,22 @@ details pre {
 .timing-trend-chart {
   margin: 8px 0 16px;
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
+}
+.svg-tip { cursor: pointer; position: relative; }
+.svg-tip:hover { r: 6; }
+.svg-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,.3);
 }
 
 /* Inline JIRA matches in failure details */
