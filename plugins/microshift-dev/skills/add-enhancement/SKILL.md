@@ -3,7 +3,7 @@ name: microshift-dev:add-enhancement
 argument-hint: [area] <name> <description> <jira>
 description: Create a new MicroShift Enhancement Proposal
 user-invocable: true
-allowed-tools: Bash, Read, Write, Glob, Grep, WebFetch
+allowed-tools: Bash, Read, Write, Glob, Grep, WebFetch, AskUserQuestion
 ---
 
 # microshift-dev:add-enhancement
