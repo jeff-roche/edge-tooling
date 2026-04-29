@@ -133,29 +133,31 @@ When a log.html URL is provided, the file contains Robot Framework test executio
 
 **For Remote URLs**:
 
-1. Download the `.tar.xz` file to `/tmp`:
+1. Create an isolated working directory and download the archive:
 
    ```bash
-   curl -L -o /tmp/sosreport-download.tar.xz "<url>"
+   WORKDIR="$(mktemp -d /tmp/sosreport-analyze.XXXXXX)"
+   ARCHIVE="$WORKDIR/sosreport-download.tar.xz"
+   curl -fL -o "$ARCHIVE" "<url>"
    ```
 
-2. Extract the archive to `/tmp`:
+2. Extract the archive into the working directory:
 
    ```bash
-   tar -xf /tmp/sosreport-download.tar.xz -C /tmp
+   tar -xf "$ARCHIVE" -C "$WORKDIR" --one-top-level=extracted
    ```
 
 3. Find the extracted directory:
 
    ```bash
-   ls -dt /tmp/sosreport-*/ 2>/dev/null | head -1
+   ls -dt "$WORKDIR"/extracted/sosreport-*/ 2>/dev/null | head -1
    ```
 
 4. Set the extracted directory as the working path
 5. Clean up the downloaded archive:
 
    ```bash
-   rm /tmp/sosreport-download.tar.xz
+   rm -f "$ARCHIVE"
    ```
 
 **For Local Paths**:
