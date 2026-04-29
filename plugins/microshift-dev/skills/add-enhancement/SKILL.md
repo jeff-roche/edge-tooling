@@ -33,7 +33,7 @@ This command automates the creation of enhancement proposals by:
 
 ## Arguments
 
-- **area** (optional): Enhancement area (subdirectory under enhancements/). If not provided, the command will attempt to infer the best area from the enhancement description and ask for confirmation.
+- **area** (optional): Enhancement area (used for categorization context). If not provided, the command will attempt to infer the best area from the enhancement description and ask for confirmation.
 - **name**: One-line title describing the enhancement
 - **description**: Detailed description (what, why, who)
 - **jira**: JIRA ticket URL for tracking
@@ -53,26 +53,16 @@ Act as an experienced software architect to create a comprehensive enhancement p
    - If verification fails, exit with a clear error message: "Error: This command must be run in the openshift/enhancements repository or a fork. Please clone the repository first or navigate to the correct directory."
    - If successful, continue to the next step
 
-1. **Determine Enhancement Area**: Identify or validate the area where the enhancement should be created:
-   - List available areas by examining subdirectories in `enhancements/microshift`: `ls -d enhancements/microshift/*/` (extract just the directory names)
+1. **Determine Enhancement Area**: Identify or validate the area for the enhancement filename:
+   - List existing enhancements in `enhancements/microshift/`: `ls enhancements/microshift/*.md` (extract just the filenames)
    - **If the `<area>` argument WAS provided by the user:**
-     - Check if `enhancements/microshift/<area>/` exists
-     - If it exists: proceed with this area
-     - If it does NOT exist:
-       - Show the list of available areas
-       - Use AskUserQuestion to ask: "The area '\<area\>' does not exist. Do you want to create a new area called '\<area\>'?" with options:
-         - "Yes, create new area '\<area\>'" (then confirm they're sure about creating a new area)
-         - "No, let me choose from existing areas" (then show available areas and ask them to select)
+     - Proceed with this area as part of the filename
    - **If the `<area>` argument was NOT provided:**
      - Analyze the enhancement name and description to infer the most appropriate area
-     - Look for keywords that match existing area names (e.g., "storage", "router", "apiserver", "coredns", "etcd", etc.)
+     - Look for keywords that match existing enhancement areas (e.g., "storage", "router", "apiserver", "coredns", "etcd", etc.)
      - Use AskUserQuestion to confirm: "Based on your enhancement description, I think the best area is '\<inferred-area\>'. Is this correct?" with options:
        - "Yes, use '\<inferred-area\>'"
-       - "No, let me choose a different area" (then list available areas and ask them to select or specify a new one)
-     - If the user chooses a different area that doesn't exist, ask if they want to create it (same flow as above)
-   - **Creating a new area (if chosen):**
-     - Create  markdown document in the new area : `touch enhancements/microshift/<new-area>.md`
-   - Proceed with the validated/created area
+       - "No, let me specify a different area"
 
 2. **Fetch the Enhancement Template**: Before starting, fetch the latest template from the openshift/enhancements repository:
    - Download the template using WebFetch; if that fails, ask the user to paste the template from: https://raw.githubusercontent.com/openshift/enhancements/master/guidelines/enhancement_template.md
@@ -94,7 +84,7 @@ Act as an experienced software architect to create a comprehensive enhancement p
    - Ask clarifying questions about telemetry, security, upgrade and downgrade process, rollbacks, dependencies, in case it is not possible to assert these fields.
 
 5. **Generate the Enhancement File**:
-   - Create the file at `enhancements/microshift/<area>.md` where filename is the kebab-case version of the name argument
+   - Create the file at `enhancements/microshift/<kebab-case-name>.md`
    - Fill in the template with:
      - **Title**: Use the provided name
      - **Summary**: One paragraph describing what this enhancement is about
@@ -133,7 +123,7 @@ Act as an experienced software architect to create a comprehensive enhancement p
    - Create a valid filename from the name (lowercase, replace spaces with dashes)
    - Verify all required YAML metadata is present
    - Verify the JIRA ticket URL is included in the tracking-link metadata field
-   - Ensure the enhancement file is created in the correct path: `enhancements/microshift/<area>.md`
+   - Ensure the enhancement file is created in the correct path: `enhancements/microshift/<kebab-case-name>.md`
 
 ## Output
 
