@@ -21,6 +21,42 @@ Given a Jira ticket ID, the skill:
 /microshift-dev:golang-cve-analyzer OCPBUGS-12345 --verbose
 ```
 
+### add-enhancement
+
+Creates a new MicroShift Enhancement Proposal (EP) based on the official template from the openshift/enhancements repository. Generates a comprehensive enhancement document with all required sections, metadata, and guidance.
+
+```bash
+/microshift-dev:add-enhancement [area] <name> <description> <jira>
+```
+
+Must be run from inside the openshift/enhancements repository or a fork.
+
+### analyze-start-time
+
+Analyzes MicroShift journal logs to extract service startup timing statistics. Parses `MICROSHIFT READY` and `SERVICE READY` log patterns across multiple restarts and produces a sorted performance table.
+
+```bash
+/microshift-dev:analyze-start-time <journal-logs-file>
+```
+
+### analyze-sos-report
+
+Investigates MicroShift runtime problems from SOS reports. Analyzes journal logs, pod status, container logs, etcd health, OVN networking, and configuration. Optionally cross-references with Robot Framework test logs.
+
+```bash
+/microshift-dev:analyze-sos-report <sos-report-path> [log.html-url]
+```
+
+### generate-tests
+
+Generates comprehensive Robot Framework test coverage for MicroShift features based on Jira OCPSTRAT tickets. Analyzes existing test coverage, creates the top 10 missing test cases, and optionally creates a git branch with implemented tests.
+
+```bash
+/microshift-dev:generate-tests OCPSTRAT-1234
+```
+
+A customizable template (`TEMPLATE.md`) is included alongside this skill for adapting the workflow to other projects or testing frameworks.
+
 ## Prerequisites
 
 | Requirement | Source |
