@@ -252,6 +252,8 @@ def resolve_project(arg: str | None, root: Path) -> dict:
 
     if arg.isdigit():
         names = get_recent_names(root)
+        if not names:
+            return {"status": "no_projects", "error_message": "No recent projects found.", "alternatives": []}
         idx = int(arg) - 1
         if idx < 0 or idx >= len(names):
             return {
