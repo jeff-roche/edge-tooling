@@ -32,7 +32,7 @@ Store the `project` object from the JSON as `P` for the remaining steps.
 
 Display a structured summary:
 
-```
+```text
 ## Project: <P.name>
 
 | Field | Value |
@@ -55,7 +55,7 @@ be loaded based on what you choose to work on."
 **If `P.repo_context_files` is non-empty:**
 Show an "Available Repo Context" table:
 
-```
+```text
 | Repo | Source | Path |
 |------|--------|------|
 | <repo> | <source> | `<path>` |
@@ -71,7 +71,8 @@ item, match its text and `section` against `P.reference_files` descriptions
 to determine which detail files are relevant.
 
 **4b.** Present via AskUserQuestion with options like:
-- "Next: <task text> (loads: file1.md, file2.md)"
+
+- "Next: \<task text\> (loads: file1.md, file2.md)"
 - "Review all project notes (loads: all detail files)"
 - "Something else"
 

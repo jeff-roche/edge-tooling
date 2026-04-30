@@ -18,14 +18,14 @@ Ask the user questions to understand what they're working on. Use the
 AskUserQuestion tool for structured questions and encourage free-text
 descriptions.
 
-**1a. Task Description**
+### 1a. Task Description
 
 If the user provided a description after "new" in the arguments, use that.
 Otherwise, ask:
 
 > "What task are you working on? Please describe it in a sentence or two."
 
-**1b. Task Type**
+### 1b. Task Type
 
 Based on the description, suggest a task type and confirm with the user.
 Use AskUserQuestion with these options:
@@ -38,13 +38,13 @@ Use AskUserQuestion with these options:
 | Documentation | Description mentions docs, writing, documenting, guide |
 | Analysis/review | Description mentions reviewing, analyzing, investigating (without a specific bug), understanding |
 
-**1c. JIRA Ticket (optional)**
+### 1c. JIRA Ticket (optional)
 
 Ask: "Do you have a JIRA ticket for this task? If so, paste the URL
 (e.g., https://issues.redhat.com/browse/OCPBUGS-12345). Otherwise, just
 say 'no'."
 
-**1d. Related Repositories**
+### 1d. Related Repositories
 
 Ask which repos from this workspace are relevant. **Dynamically load
 the repo list** from `dev-env.yaml` at the workspace root:
@@ -57,7 +57,7 @@ the repo list** from `dev-env.yaml` at the workspace root:
    and note that no repos are configured (the user can add them
    later by editing the project's CLAUDE.md frontmatter).
 
-**1e. Additional Context (optional)**
+### 1e. Additional Context (optional)
 
 Ask: "Any additional context? (PR URLs, Prow job URLs, related projects,
 etc.) Say 'no' to skip."
@@ -85,7 +85,7 @@ Based on the gathered information:
 
 Create the project directory and generate files based on the task type.
 
-**3a. Create directory structure**
+### 3a. Create directory structure
 
 Use the Bash tool to create directories. The base is always
 `projects/<folder-name>/`.
@@ -100,7 +100,7 @@ Additional subdirectories by type:
 | Documentation | `drafts/` |
 | Analysis/review | `docs/` |
 
-**3b. Generate CLAUDE.md (lean index)**
+### 3b. Generate CLAUDE.md (lean index)
 
 Write a **lean index** CLAUDE.md (~50-80 lines) at
 `projects/<folder-name>/CLAUDE.md` using the Write tool. This file is
@@ -110,18 +110,18 @@ where to look. All detailed content goes into separate files (Step 3d).
 The content MUST follow the lean template for the detected type
 (see [CLAUDE.md Templates](#claudemd-templates) below).
 
-**3c. Generate .gitignore**
+### 3c. Generate .gitignore
 
 Write a `.gitignore` at `projects/<folder-name>/.gitignore` with:
 
-```
+```gitignore
 # Large files that shouldn't be committed
 *.log
 *.txt.gz
 *.tar.gz
 ```
 
-**3d. Create starter detail files**
+### 3d. Create starter detail files
 
 Create type-specific starter files alongside CLAUDE.md. Use the Write
 tool for each file. Every file created MUST have a corresponding row in
@@ -145,13 +145,13 @@ After creating the project, provide a summary:
 1. List the files and directories created
 2. Suggest relevant skills based on the task type:
 
-| Type | Skills to suggest |
-|------|-------------------|
-| bug | `/prow-job:analyze-test-failure`, `/prow-job:analyze-install-failure`, `/prow-job:extract-must-gather`, `/feature-dev:feature-dev` |
-| feature | `/feature-dev:feature-dev`, `/pr-review-toolkit:review-pr` |
-| ci-testing | `/prow-job:analyze-test-failure`, `/prow-job:analyze-install-failure`, `/prow-job:analyze-resource`, `/prow-job:extract-must-gather` |
-| docs | `/feature-dev:feature-dev` |
-| analysis | `/pr-review-toolkit:review-pr`, `/prow-job:analyze-test-failure`, `/feature-dev:feature-dev` |
+   | Type | Skills to suggest |
+   |------|-------------------|
+   | bug | `/prow-job:analyze-test-failure`, `/prow-job:analyze-install-failure`, `/prow-job:extract-must-gather`, `/feature-dev:feature-dev` |
+   | feature | `/feature-dev:feature-dev`, `/pr-review-toolkit:review-pr` |
+   | ci-testing | `/prow-job:analyze-test-failure`, `/prow-job:analyze-install-failure`, `/prow-job:analyze-resource`, `/prow-job:extract-must-gather` |
+   | docs | `/feature-dev:feature-dev` |
+   | analysis | `/pr-review-toolkit:review-pr`, `/prow-job:analyze-test-failure`, `/feature-dev:feature-dev` |
 
 3. Suggest concrete next steps for starting the work
 4. Remind the user they can resume this project later with
@@ -216,6 +216,7 @@ these sections in order:
 ### Type-Specific Content
 
 For each type below, the specification defines:
+
 - The summary heading name
 - Metadata bullets to include in the summary
 - Which detail files to create (→ rows in Reference Files table)
@@ -223,6 +224,7 @@ For each type below, the specification defines:
 - The progress checklist items
 
 **Bug Investigation** (`type: bug`)
+
 - Summary heading: `## Bug Summary`
 - Metadata: Jira, Assignee (TBD)
 - Detail files: `investigation.md`, `ci-runs.md`, `source-code-map.md`
@@ -233,6 +235,7 @@ For each type below, the specification defines:
   Root cause identified, Fix implemented, PR submitted
 
 **Feature Development** (`type: feature`)
+
 - Summary heading: `## Feature Summary`
 - Metadata: Jira, Target Version (TBD)
 - Detail files: `design.md`, `source-code-map.md`
@@ -243,6 +246,7 @@ For each type below, the specification defines:
   PR(s) submitted, PR(s) merged
 
 **CI/Testing** (`type: ci-testing`)
+
 - Summary heading: `## Test Summary`
 - Metadata: Jira, CI Job(s) (TBD)
 - Detail files: `ci-runs.md`, `test-failures.md`
@@ -253,6 +257,7 @@ For each type below, the specification defines:
   CI passing
 
 **Documentation** (`type: docs`)
+
 - Summary heading: `## Doc Summary`
 - Metadata: Jira, Target (which docs are created/updated)
 - Detail files: `drafts.md`
@@ -263,6 +268,7 @@ For each type below, the specification defines:
   PR submitted
 
 **Analysis/Review** (`type: analysis`)
+
 - Summary heading: `## Analysis Summary`
 - Metadata: Jira, Scope (what is being analyzed/reviewed)
 - Detail files: `findings.md`
@@ -329,6 +335,7 @@ _Root cause goes here once identified._
 ```
 
 When populating this file:
+
 - For each selected repo, check `repos/<repo>/CLAUDE.md` or
   `presets/*/context/<repo>.md` for "Key paths", "Key files",
   or similar sections.
