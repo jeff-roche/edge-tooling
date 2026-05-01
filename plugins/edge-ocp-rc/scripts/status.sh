@@ -490,7 +490,8 @@ RUN_LAUNCHED="$LAUNCHED"
 
 # Collect results for all topologies
 for topo_name in "${TOPO_LIST[@]}"; do
-    # Per-topology config takes precedence over run-level config
+    RELEASE_IMAGE="$RUN_RELEASE_IMAGE"
+    LAUNCHED="$RUN_LAUNCHED"
     if [[ -f "$RUN_DIR/$topo_name/config.env" ]]; then
         load_config "$RUN_DIR/$topo_name/config.env"
     fi
