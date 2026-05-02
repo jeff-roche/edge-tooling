@@ -119,6 +119,7 @@ fi
 if [[ -n "$RUN_NAME" ]]; then
     RUN_DIR="$SCRIPT_DIR/runs/$RUN_NAME"
 else
+    # shellcheck disable=SC2012
     RUN_DIR=$(ls -td "$SCRIPT_DIR/runs"/*/ 2>/dev/null | head -1 || true)
 fi
 
@@ -392,17 +393,17 @@ build_topology_json() {
     if [[ -s "$source_file" ]]; then
         jobs_json=$(while IFS=$'\t' read -r num status job_name url reason classification pass_pct; do
             local args=(--argjson num "$num" --arg status "$status" --arg job "$job_name" --arg url "$url")
-            local fields='number:$num, job:$job, status:$status, url:$url'
+            local fields="number:\$num, job:\$job, status:\$status, url:\$url"
 
             if $FETCH_LOGS && [[ -n "$reason" ]]; then
                 args+=(--arg reason "$reason")
-                fields+=', failure_reason:$reason'
+                fields+=", failure_reason:\$reason"
             fi
             if $CLASSIFY && [[ -n "$classification" ]]; then
                 local pct_num
                 pct_num=$(printf '%.1f' "$pass_pct" 2>/dev/null || echo "0")
                 args+=(--arg classification "$classification" --argjson nightly_pass_rate "$pct_num")
-                fields+=', classification:$classification, nightly_pass_rate:$nightly_pass_rate'
+                fields+=", classification:\$classification, nightly_pass_rate:\$nightly_pass_rate"
             fi
 
             jq -n "${args[@]}" "{${fields}}"

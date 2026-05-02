@@ -299,6 +299,7 @@ if $LIST_ONLY; then
 fi
 
 if $RELAUNCH_FAILED; then
+    # shellcheck disable=SC2012
     PREV_RUN_DIR=$(ls -td "$SCRIPT_DIR/runs"/*/"$TOPOLOGY" 2>/dev/null | head -1 || true)
 
     if [[ -z "$PREV_RUN_DIR" || ! -d "$PREV_RUN_DIR" ]]; then
@@ -429,22 +430,22 @@ launch_from_file() {
         if $DRY_RUN; then
             echo "  [dry-run] would launch with --initial=$job_initial --latest=$RELEASE_IMAGE"
         else
-            GANGWAY_OUTPUT=$("$GANGWAY_BIN" \
+            if GANGWAY_OUTPUT=$("$GANGWAY_BIN" \
                 --api-url="$GANGWAY_API" \
                 --initial "$job_initial" \
                 --latest "$RELEASE_IMAGE" \
                 --job-name "$JOB" \
-                --jobs-file-path="$RUN_DIR" 2>&1) && {
+                --jobs-file-path="$RUN_DIR" 2>&1); then
                 echo "  launched"
                 sleep "$DELAY"
-            } || {
+            else
                 if echo "$GANGWAY_OUTPUT" | grep -q "500 Internal Server Error"; then
                     echo "  SKIPPED — job not found in Prow (HTTP 500). Remove from job file or run --refresh."
                 else
                     echo "  FAILED to launch: $GANGWAY_OUTPUT"
                     FAILED=$((FAILED + 1))
                 fi
-            }
+            fi
         fi
     done < "$file"
 }
