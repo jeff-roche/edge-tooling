@@ -449,7 +449,8 @@ def merge_candidate_files(filepaths, workdir=None):
     total_candidates = len(all_candidates)
 
     # Inject Jira data from bug mapping files when available.
-    # Empty arrays mean "searched, nothing found" (distinct from absent = never searched).
+    # The lookup is authoritative — always overwrite the candidate's
+    # duplicates/regressions since candidate files never carry Jira data.
     jira_injected = 0
     if workdir:
         jira_lookup = _load_jira_lookup(workdir)
@@ -457,10 +458,8 @@ def merge_candidate_files(filepaths, workdir=None):
             sig = cand.get("error_signature", "")
             if sig in jira_lookup:
                 jira_data = jira_lookup[sig]
-                if "duplicates" not in cand:
-                    cand["duplicates"] = jira_data["duplicates"]
-                if "regressions" not in cand:
-                    cand["regressions"] = jira_data["regressions"]
+                cand["duplicates"] = jira_data["duplicates"]
+                cand["regressions"] = jira_data["regressions"]
                 jira_injected += 1
         if jira_injected:
             print(f"Injected Jira data into {jira_injected}/{total_candidates} candidates from bug mapping files", file=sys.stderr)
