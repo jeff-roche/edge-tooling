@@ -205,7 +205,7 @@ python3 plugins/microshift-ci/scripts/search-bugs.py --merge <WORKDIR>/analyze-c
 
 This writes `<WORKDIR>/analyze-ci-bug-candidates-merged.json`. Read and use this file for all subsequent steps.
 
-**If single source**: Read `<WORKDIR>/analyze-ci-bug-candidates-<source>.json` directly. The Jira data is already populated from Step 1a or Step 2.
+**If single source**: Read `<WORKDIR>/analyze-ci-bugs-<source>.json` directly. This is the bug mapping file written in Step 2 (or validated from cache in Step 1a) and contains `duplicates[]`/`regressions[]` for each candidate. Do **not** use `analyze-ci-bug-candidates-<source>.json` here — that is the Step 1 output and lacks Jira data. The `--merge` path injects Jira data automatically via `_load_jira_lookup()`, but the single-source path skips merge, so the bug mapping file is the source of truth.
 
 ### Step 3: Present Bug Candidates to User
 
