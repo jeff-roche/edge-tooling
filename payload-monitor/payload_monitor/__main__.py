@@ -34,24 +34,34 @@ def _setup_logging(verbose: bool) -> None:
     )
 
 
-def _collect_blocking_jobs(report: MonitorReport) -> list[dict]:
-    """Collect blocking edge job failures from the report.
+def _emit_job_section(label: str, jobs: list[dict]) -> None:
+    """Print a labeled section of pipe-delimited job entries to stdout."""
+    if not jobs:
+        return
+    print(f"{label}_JOBS_START")
+    for j in jobs:
+        print(f"{label}|{j['name']}|{j['prow_url']}|{j['topology']}|{j['version']}|{j['payload_tag']}")
+    print(f"{label}_JOBS_END")
+
+
+def _collect_jobs_by_type(report: MonitorReport, job_type: JobType) -> list[dict]:
+    """Collect edge job failures of a given type from the report.
 
     Returns a list of dicts with keys: name, prow_url, topology, version, payload_tag.
     """
-    blocking = []
+    jobs = []
     for stream in report.streams:
         for payload in stream.payloads:
             for j in payload.edge_jobs:
-                if j.result == JobResult.FAILURE and j.job_type == JobType.BLOCKING:
-                    blocking.append({
+                if j.result == JobResult.FAILURE and j.job_type == job_type:
+                    jobs.append({
                         "name": j.name,
                         "prow_url": j.prow_url,
                         "topology": j.topology or "",
                         "version": stream.version,
                         "payload_tag": payload.tag,
                     })
-    return blocking
+    return jobs
 
 
 @click.command()
@@ -73,12 +83,14 @@ def _collect_blocking_jobs(report: MonitorReport) -> list[dict]:
               help="Skip Sippy regression and Component Readiness checks")
 @click.option("--with-timing", is_flag=True, default=False,
               help="Include install/upgrade timing insights (disabled by default)")
+@click.option("--payloads", type=click.IntRange(min=1, max=10), default=None,
+              help="Number of payloads to analyze per stream (1-10, default 5)")
 @click.option("--merge-analysis", "merge_analysis_path", type=click.Path(exists=True), default=None,
               help="Merge analysis JSON into an existing HTML report (or into --from-json data)")
 def main(
     versions, output_path, from_json, export_json,
     open_browser, verbose, skip_prow, skip_sippy, with_timing,
-    merge_analysis_path,
+    payloads, merge_analysis_path,
 ):
     """Edge OCP Payload Monitor — monitor OpenShift nightly payloads for edge topology failures."""
     _setup_logging(verbose)
@@ -86,6 +98,8 @@ def main(
 
     # Build config
     config = Config()
+    if payloads is not None:
+        config.payloads_per_stream = payloads
 
     # Determine output path
     if not output_path:
@@ -222,6 +236,7 @@ def main(
         data_errors=data_errors,
         recurring_threshold=config.recurring_threshold,
         persistent_threshold=config.persistent_threshold,
+        payloads_per_stream=config.payloads_per_stream,
     )
 
     # Step 4: Analyze and find JIRA matches
@@ -247,13 +262,9 @@ def main(
     logger.info(f"Done. {total_edge_failures} edge failures, {total_regressions} regressions")
     logger.info(f"Report: {html_path.resolve()}")
 
-    # Print blocking job summary to stdout for skill consumption
-    blocking = _collect_blocking_jobs(report)
-    if blocking:
-        print("BLOCKING_JOBS_START")
-        for b in blocking:
-            print(f"BLOCKING|{b['name']}|{b['prow_url']}|{b['topology']}|{b['version']}|{b['payload_tag']}")
-        print("BLOCKING_JOBS_END")
+    # Print job summaries to stdout for skill consumption
+    _emit_job_section("BLOCKING", _collect_jobs_by_type(report, JobType.BLOCKING))
+    _emit_job_section("INFORMING", _collect_jobs_by_type(report, JobType.INFORMING))
 
     if open_browser:
         webbrowser.open(f"file://{html_path.resolve()}")

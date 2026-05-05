@@ -14,6 +14,7 @@ Automate MicroShift release testing activities — from pre-release evaluation t
 | Skill | Phase | Description |
 |---|---|---|
 | `/microshift-release:pre-check` | Pre-Check | Evaluate whether MicroShift should participate in an OCP release (z-stream, nightly, EC/RC) |
+| `/microshift-release:release-versions` | Pre-Check | Check if a MicroShift version is available and where to find RPMs, bootc images, and Brew builds |
 
 ## Roadmap
 

@@ -16,15 +16,19 @@
   <div style="text-align:right">
     <div class="meta"><a href="https://github.com/openshift-eng/edge-tooling" target="_blank" style="color:var(--text-muted)">View source on GitHub ↗</a></div>
     <div class="meta">Generated: {{ report.generated_at }}</div>
-    {% set has_ai = [] %}{% for item in all_failing %}{% if item.job.deep_analysis %}{% if has_ai.append(1) %}{% endif %}{% endif %}{% endfor %}
+    {% set has_ai = [] %}{% set has_blocking = [] %}{% for item in all_failing %}{% if item.job.deep_analysis %}{% if has_ai.append(1) %}{% endif %}{% endif %}{% if item.job.job_type.value == "blocking" %}{% if has_blocking.append(1) %}{% endif %}{% endif %}{% endfor %}
     {% if has_ai %}
     <div class="meta" style="margin-top:4px">
       <span style="color:var(--green)">● AI-enriched via Claude</span>
     </div>
-    {% else %}
+    {% elif has_blocking %}
     <div class="meta" style="margin-top:4px">
       <span style="color:var(--text-muted)">○ Data only</span>
       <span style="margin-left:4px">— run <code style="font-size:12px;color:var(--accent)">/edge-ocp-ci:generate-dashboard</code> for AI analysis</span>
+    </div>
+    {% else %}
+    <div class="meta" style="margin-top:4px">
+      <span style="color:var(--green)">● No blocking failures found</span>
     </div>
     {% endif %}
   </div>
@@ -74,7 +78,7 @@
 {% endif %}
 
 {% if report.jira_errors %}
-<div class="error-banner">
+<div class="warning-banner">
   <strong>JIRA search errors:</strong> {{ report.jira_errors | length }} JIRA search{{ 'es' if report.jira_errors | length != 1 else '' }} failed. Bug matching may be incomplete for affected jobs.
   <details class="error-details">
     <summary>Show details</summary>
@@ -84,6 +88,13 @@
       {% endfor %}
     </ul>
   </details>
+</div>
+{% endif %}
+
+{% if report.payloads_per_stream < report.persistent_threshold %}
+<div class="warning-banner">
+  <strong>Note:</strong> Analyzing only {{ report.payloads_per_stream }} payload{{ 's' if report.payloads_per_stream != 1 else '' }} per stream —
+  {% if report.payloads_per_stream < report.recurring_threshold %}Recurring, {% endif %}Persistent{% if report.payloads_per_stream < 3 %} and Unstable{% endif %} failure labels require more payloads to appear.
 </div>
 {% endif %}
 
@@ -259,9 +270,11 @@
   {# Situation bar: compact horizontal summary with real context #}
   <div class="fs-situation-bar">
     <div class="fs-situation-item {% if blocking_jobs_list %}critical{% endif %}" onclick="jumpToFailures(null,'blocking')" title="View blocking failures">
-      <span class="fs-situation-count">{{ blocking_jobs_list|length }}</span>
+      <span class="fs-situation-count">{{ ns.blocking_failures }}</span>
       <span class="fs-situation-label">blocking</span>
-      {% if ns.rejected_payloads > 0 %}
+      {% if blocking_jobs_list|length < ns.blocking_failures %}
+      <span class="fs-situation-context">{{ blocking_jobs_list|length }} unique job{{ 's' if blocking_jobs_list|length != 1 else '' }}</span>
+      {% elif ns.rejected_payloads > 0 %}
       <span class="fs-situation-context">{{ ns.rejected_payloads }} payload{{ 's' if ns.rejected_payloads != 1 else '' }} rejected</span>
       {% endif %}
     </div>
@@ -299,8 +312,8 @@
       <div class="fs-severity-icon fs-icon-critical" title="Critical — requires immediate action">!</div>
       <div class="fs-section-content">
         <div class="fs-priority-label">Critical — Immediate Action Required</div>
-        <div class="fs-section-title">{{ blocking_jobs_list|length }} Blocking Job{{ 's' if blocking_jobs_list|length != 1 else '' }} Failing</div>
-        <div class="fs-section-desc">{{ ns.blocking_failures }} failure{{ 's' if ns.blocking_failures != 1 else '' }} across {{ ns.rejected_payloads }} rejected payload{{ 's' if ns.rejected_payloads != 1 else '' }} — prevents payload acceptance</div>
+        <div class="fs-section-title">{{ ns.blocking_failures }} Blocking Failure{{ 's' if ns.blocking_failures != 1 else '' }}{% if blocking_jobs_list|length < ns.blocking_failures %} ({{ blocking_jobs_list|length }} Unique Job{{ 's' if blocking_jobs_list|length != 1 else '' }}){% endif %}</div>
+        <div class="fs-section-desc">prevents payload acceptance</div>
       </div>
       <a class="fs-section-action fs-action-critical" onclick="jumpToFailures(null,'blocking')">Investigate All &#8594;</a>
     </div>
@@ -494,7 +507,7 @@
     {% if also_in %}
     <span class="cross-topo-hint" title="The same base job is also failing in other topologies, suggesting a shared platform issue.">Also in: {% for t in also_in %}<span class="badge {{ t|lower }}">{{ t }}</span>{% endfor %}</span>
     {% endif %}
-    {{ detail.job.name }} ({{ detail.version }})
+    {{ detail.job.name }} <span class="detail-version">({{ detail.version }})</span>
   </summary>
   <div class="content">
     <p><strong>Payload:</strong> <a href="{{ detail.payload_url }}" target="_blank">{{ detail.payload_tag }}</a></p>

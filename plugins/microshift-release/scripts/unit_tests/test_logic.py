@@ -7,9 +7,26 @@ import unittest
 # Add parent directory to path so we can import the modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from precheck_xyz import compute_recommendation, interpret_cves, format_text_short, _build_reason  # noqa: E402
-from precheck_ecrc import parse_ecrc_version, format_text as ecrc_format_text  # noqa: E402
-from precheck_nightly import classify_gap, format_gap, format_text as nightly_format_text  # noqa: E402
+from precheck_xyz import (  # noqa: E402
+    compute_recommendation, interpret_cves, format_text_short, _build_reason,
+)
+from lib.ocpbugs import _issue_to_dict  # noqa: E402
+from precheck_ecrc import (  # noqa: E402
+    parse_ecrc_version, format_text as ecrc_format_text,
+)
+from precheck_nightly import (  # noqa: E402
+    classify_gap, format_gap, format_text as nightly_format_text,
+)
+
+
+def _ocpbugs(count=0, required=0, not_required=0, review=0):
+    """Build an ocpbugs dict for test fixtures."""
+    return {
+        "count": count, "bugs": [], "skipped": False,
+        "release_required": required,
+        "release_not_required": not_required,
+        "needs_review": review,
+    }
 
 
 class TestClassifyGap(unittest.TestCase):
@@ -154,6 +171,7 @@ class TestComputeRecommendation(unittest.TestCase):
             "cve_impact": {"impact": "must_release", "details": [{"cve": "CVE-2026-1"}]},
             "commits": 5,
             "days_since": 10,
+            "ocp_status": "available",
         }
         rec, reason = compute_recommendation(evaluation)
         self.assertEqual(rec, "ASK ART TO CREATE ARTIFACTS")
@@ -164,6 +182,7 @@ class TestComputeRecommendation(unittest.TestCase):
             "cve_impact": {"impact": "none"},
             "commits": 3,
             "days_since": 95,
+            "ocp_status": "available",
         }
         rec, reason = compute_recommendation(evaluation)
         self.assertEqual(rec, "ASK ART TO CREATE ARTIFACTS")
@@ -213,6 +232,101 @@ class TestComputeRecommendation(unittest.TestCase):
         }
         rec, _ = compute_recommendation(evaluation)
         self.assertEqual(rec, "SKIP")
+
+    def test_ocpbugs_triggers_needs_review(self):
+        evaluation = {
+            "cve_impact": {"impact": "none"},
+            "commits": 5,
+            "days_since": 30,
+            "ocp_status": "available",
+            "ocpbugs": _ocpbugs(count=3, review=3),
+        }
+        rec, reason = compute_recommendation(evaluation)
+        self.assertEqual(rec, "NEEDS REVIEW")
+        self.assertIn("OCPBUGS", reason)
+
+    def test_ocpbugs_needs_review_no_ocp(self):
+        evaluation = {
+            "cve_impact": {"impact": "none"},
+            "commits": 5,
+            "days_since": 30,
+            "ocp_status": "not_available",
+            "ocpbugs": _ocpbugs(count=2, review=2),
+        }
+        rec, reason = compute_recommendation(evaluation)
+        self.assertEqual(rec, "NEEDS REVIEW")
+        self.assertIn("OCPBUGS", reason)
+
+    def test_no_ocpbugs_still_skip(self):
+        evaluation = {
+            "cve_impact": {"impact": "none"},
+            "commits": 5,
+            "days_since": 30,
+            "ocp_status": "available",
+            "ocpbugs": {"count": 0, "bugs": [], "skipped": False},
+        }
+        rec, _ = compute_recommendation(evaluation)
+        self.assertEqual(rec, "SKIP")
+
+    def test_90_day_overrides_release_not_required(self):
+        evaluation = {
+            "cve_impact": {"impact": "none"},
+            "commits": 5,
+            "days_since": 95,
+            "ocp_status": "available",
+            "ocpbugs": _ocpbugs(count=1, not_required=1),
+        }
+        rec, reason = compute_recommendation(evaluation)
+        self.assertEqual(rec, "ASK ART TO CREATE ARTIFACTS")
+        self.assertIn("90-day", reason)
+
+    def test_release_required_label(self):
+        evaluation = {
+            "cve_impact": {"impact": "none"},
+            "commits": 5,
+            "days_since": 30,
+            "ocp_status": "available",
+            "ocpbugs": _ocpbugs(count=2, required=1, not_required=1),
+        }
+        rec, reason = compute_recommendation(evaluation)
+        self.assertEqual(rec, "ASK ART TO CREATE ARTIFACTS")
+        self.assertIn("release-required", reason)
+
+    def test_release_not_required_label_skips(self):
+        evaluation = {
+            "cve_impact": {"impact": "none"},
+            "commits": 5,
+            "days_since": 30,
+            "ocp_status": "available",
+            "ocpbugs": _ocpbugs(count=1, not_required=1),
+        }
+        rec, reason = compute_recommendation(evaluation)
+        self.assertEqual(rec, "SKIP")
+        self.assertIn("release-not-required", reason)
+
+    def test_release_required_no_ocp(self):
+        evaluation = {
+            "cve_impact": {"impact": "none"},
+            "commits": 5,
+            "days_since": 30,
+            "ocp_status": "not_available",
+            "ocpbugs": _ocpbugs(count=1, required=1),
+        }
+        rec, reason = compute_recommendation(evaluation)
+        self.assertEqual(rec, "NEEDS REVIEW")
+        self.assertIn("OCP payload not yet available", reason)
+
+    def test_cve_takes_priority_over_ocpbugs(self):
+        evaluation = {
+            "cve_impact": {"impact": "must_release", "details": [{"cve": "CVE-2026-1"}]},
+            "commits": 5,
+            "days_since": 10,
+            "ocp_status": "available",
+            "ocpbugs": {"count": 3, "bugs": [], "skipped": False},
+        }
+        rec, reason = compute_recommendation(evaluation)
+        self.assertEqual(rec, "ASK ART TO CREATE ARTIFACTS")
+        self.assertIn("CVE fix", reason)
 
 
 class TestNightlyFormatText(unittest.TestCase):
@@ -377,17 +491,6 @@ class TestXyzFormatTextShort(unittest.TestCase):
         self.assertIn("[OCP: available]", result)
         self.assertIn("no CVEs", result)
 
-    def test_eol_lifecycle(self):
-        evals = [{
-            "version": "4.14.50",
-            "recommendation": "SKIP",
-            "ocp_status": "available",
-            "lifecycle_status": "End of life",
-            "lifecycle_end_date": "2025-10-31",
-        }]
-        result = format_text_short(evals)
-        self.assertIn("End of life", result)
-
     def test_ask_art(self):
         evals = [{
             "version": "4.21.9",
@@ -420,6 +523,104 @@ class TestBuildReason(unittest.TestCase):
         })
         self.assertIn("advisory report unavailable", result)
 
+    def test_ocpbugs_in_reason(self):
+        result = _build_reason({
+            "cve_impact": {"impact": "none"},
+            "ocpbugs": _ocpbugs(count=3, required=1, not_required=2),
+            "last_released": "4.21.7",
+            "days_since": 30,
+        })
+        self.assertIn("3 OCPBUGS", result)
+        self.assertIn("1 release-required", result)
+        self.assertIn("2 release-not-required", result)
+
+    def test_no_ocpbugs_in_reason(self):
+        result = _build_reason({
+            "cve_impact": {"impact": "none"},
+            "ocpbugs": {"count": 0, "bugs": [], "skipped": False},
+            "last_released": "4.21.7",
+            "days_since": 30,
+        })
+        self.assertIn("no OCPBUGS", result)
+
+    def test_ocpbugs_skipped_not_shown(self):
+        result = _build_reason({
+            "cve_impact": {"impact": "none"},
+            "ocpbugs": {"count": 0, "bugs": [], "skipped": True},
+            "last_released": "4.21.7",
+            "days_since": 30,
+        })
+        self.assertNotIn("OCPBUGS", result)
+
+
+class TestIssueToDict(unittest.TestCase):
+    """Tests for _issue_to_dict label-triage logic in ocpbugs.py."""
+
+    @staticmethod
+    def _make_issue(key, summary, status, labels=None):
+        """Build a minimal mock Jira issue."""
+        from types import SimpleNamespace
+        fields = SimpleNamespace(
+            summary=summary,
+            status=status,
+            labels=labels or [],
+        )
+        return SimpleNamespace(key=key, fields=fields)
+
+    def test_release_required_label(self):
+        issue = self._make_issue(
+            "OCPBUGS-111", "fix crash", "Verified",
+            labels=["release-required"],
+        )
+        result = _issue_to_dict(issue, "fixVersion")
+        self.assertEqual(result["release_action"], "release_required")
+        self.assertEqual(result["source"], "fixVersion")
+
+    def test_release_not_required_label(self):
+        issue = self._make_issue(
+            "OCPBUGS-222", "minor tweak", "Closed",
+            labels=["release-not-required"],
+        )
+        result = _issue_to_dict(issue, "commit")
+        self.assertEqual(result["release_action"], "release_not_required")
+        self.assertEqual(result["source"], "commit")
+
+    def test_no_labels_needs_review(self):
+        issue = self._make_issue(
+            "OCPBUGS-333", "unlabeled bug", "MODIFIED",
+        )
+        result = _issue_to_dict(issue, "fixVersion")
+        self.assertEqual(result["release_action"], "needs_review")
+
+    def test_both_labels_needs_review(self):
+        issue = self._make_issue(
+            "OCPBUGS-444", "conflicting labels", "ON_QA",
+            labels=["release-required", "release-not-required"],
+        )
+        result = _issue_to_dict(issue, "fixVersion")
+        self.assertEqual(result["release_action"], "needs_review")
+
+    def test_extra_labels_ignored(self):
+        issue = self._make_issue(
+            "OCPBUGS-555", "extra labels", "Verified",
+            labels=["team/microshift", "release-required", "priority/high"],
+        )
+        result = _issue_to_dict(issue, "fixVersion")
+        self.assertEqual(result["release_action"], "release_required")
+        self.assertIn("team/microshift", result["labels"])
+
+    def test_basic_fields_extracted(self):
+        issue = self._make_issue(
+            "OCPBUGS-666", "test summary", "Closed",
+        )
+        result = _issue_to_dict(issue, "commit")
+        self.assertEqual(result["key"], "OCPBUGS-666")
+        self.assertEqual(result["summary"], "test summary")
+        self.assertEqual(result["status"], "Closed")
+        self.assertEqual(result["release_note"], "")
+        self.assertEqual(result["release_note_type"], "")
+        self.assertEqual(result["release_note_status"], "")
+
 
 class TestJqlSanitization(unittest.TestCase):
     def test_normal_version_unchanged(self):
@@ -437,6 +638,181 @@ class TestJqlSanitization(unittest.TestCase):
         from lib.art_jira import _sanitize_jql_value
         result = _sanitize_jql_value("4.22.0-ec.5")
         self.assertIn("\\-", result)
+
+
+class TestExtractCommitFromNvr(unittest.TestCase):
+    """Tests for brew.extract_commit_from_nvr NVR parsing."""
+
+    def _call_with_mock(self, rpms_result):
+        """Call extract_commit_from_nvr with a mocked find_zstream_rpms."""
+        from unittest.mock import patch
+        with patch("lib.brew.find_zstream_rpms", return_value=rpms_result):
+            from lib.brew import extract_commit_from_nvr
+            return extract_commit_from_nvr("4.21.11")
+
+    def test_valid_nvr_with_commit(self):
+        """NVR with g<sha> suffix returns the commit hash."""
+        rpms = {
+            "found": True,
+            "nvr": "microshift-4.21.11-202604201054.p0.g7f7539e.assembly.4.21.11.el9",
+            "build_date": "2026-04-20",
+        }
+        self.assertEqual(self._call_with_mock(rpms), "7f7539e")
+
+    def test_valid_nvr_long_commit(self):
+        """NVR with a longer commit hash is also extracted."""
+        rpms = {
+            "found": True,
+            "nvr": "microshift-4.18.36-202603150930.p0.gabcdef0123.assembly.4.18.36.el9",
+            "build_date": "2026-03-15",
+        }
+        self.assertEqual(self._call_with_mock(rpms), "abcdef0123")
+
+    def test_nvr_without_commit_suffix(self):
+        """NVR without g<sha> suffix returns None."""
+        rpms = {
+            "found": True,
+            "nvr": "microshift-4.21.11-202604201054.p0.assembly.4.21.11.el9",
+            "build_date": "2026-04-20",
+        }
+        self.assertIsNone(self._call_with_mock(rpms))
+
+    def test_rpm_not_found(self):
+        """No matching RPM in Brew returns None."""
+        rpms = {"found": False}
+        self.assertIsNone(self._call_with_mock(rpms))
+
+
+class TestFindLatestFromErrata(unittest.TestCase):
+    """Tests for pyxis._find_latest_from_errata Hydra API parsing."""
+
+    def _call_with_mock(self, json_response=None, exc=None):
+        from unittest.mock import patch, MagicMock
+        mock_resp = MagicMock()
+        if exc:
+            with patch("lib.pyxis.requests.get", side_effect=exc):
+                from lib.pyxis import _find_latest_from_errata
+                return _find_latest_from_errata("4.16")
+        mock_resp.json.return_value = json_response
+        mock_resp.raise_for_status.return_value = None
+        with patch("lib.pyxis.requests.get", return_value=mock_resp):
+            from lib.pyxis import _find_latest_from_errata
+            return _find_latest_from_errata("4.16")
+
+    def test_happy_path(self):
+        data = {"response": {"docs": [
+            {"portal_synopsis": "Red Hat build of MicroShift 4.16.58 security update",
+             "portal_publication_date": "2026-03-19T00:00:00Z"},
+        ]}}
+        result = self._call_with_mock(data)
+        self.assertEqual(result["version"], "4.16.58")
+        self.assertEqual(result["z"], 58)
+        self.assertEqual(result["date"], "2026-03-19")
+
+    def test_no_matching_synopsis(self):
+        data = {"response": {"docs": [
+            {"portal_synopsis": "OpenShift Container Platform update",
+             "portal_publication_date": "2026-03-19T00:00:00Z"},
+        ]}}
+        self.assertIsNone(self._call_with_mock(data))
+
+    def test_empty_docs(self):
+        data = {"response": {"docs": []}}
+        self.assertIsNone(self._call_with_mock(data))
+
+    def test_network_failure(self):
+        import requests
+        self.assertIsNone(self._call_with_mock(
+            exc=requests.RequestException("timeout")))
+
+
+class TestIsVersionPublishedErrataFallback(unittest.TestCase):
+    """Tests for the errata fallback in is_version_published."""
+
+    def _call(self, version, errata_result):
+        from unittest.mock import patch
+        # Pyxis returns nothing (all pages empty)
+        with patch("lib.pyxis._fetch_page", return_value="{}"):
+            with patch("lib.pyxis._find_latest_from_errata",
+                       return_value=errata_result):
+                from lib.pyxis import is_version_published
+                return is_version_published(version, pages=1)
+
+    def test_version_before_latest(self):
+        errata = {"version": "4.16.58", "z": 58, "date": "2026-03-19"}
+        self.assertTrue(self._call("4.16.57", errata))
+
+    def test_version_equals_latest(self):
+        errata = {"version": "4.16.58", "z": 58, "date": "2026-03-19"}
+        self.assertTrue(self._call("4.16.58", errata))
+
+    def test_version_after_latest(self):
+        errata = {"version": "4.16.58", "z": 58, "date": "2026-03-19"}
+        self.assertFalse(self._call("4.16.60", errata))
+
+    def test_no_errata(self):
+        self.assertFalse(self._call("4.16.60", None))
+
+
+class TestEolSkipFormatting(unittest.TestCase):
+    """Tests for EOL version display in format_text_short."""
+
+    def test_eol_version(self):
+        evals = [{
+            "version": "4.14.30",
+            "recommendation": "SKIP",
+            "lifecycle_status": "End of life",
+        }]
+        result = format_text_short(evals)
+        self.assertIn("End of life", result)
+        self.assertIn("SKIP", result)
+        # Should not contain OCP status or advisory info
+        self.assertNotIn("OCP:", result)
+
+    def test_eol_mixed_with_active(self):
+        evals = [
+            {"version": "4.15.63", "recommendation": "SKIP",
+             "lifecycle_status": "End of life"},
+            {"version": "4.21.12", "recommendation": "SKIP",
+             "ocp_status": "available",
+             "cve_impact": {"impact": "none"},
+             "days_since": 2, "last_released": "4.21.11"},
+        ]
+        result = format_text_short(evals)
+        lines = result.strip().split("\n")
+        self.assertEqual(len(lines), 2)
+        self.assertIn("End of life", lines[0])
+        self.assertIn("OCP:", lines[1])
+
+
+class TestBuildRevisionRange(unittest.TestCase):
+    """Tests for git_ops.build_revision_range priority ordering."""
+
+    def test_tag_wins_over_commit(self):
+        """When a tag exists, since_commit is ignored."""
+        from unittest.mock import patch
+        with patch("lib.git_ops.find_version_tag",
+                   return_value="4.21.7-202603230928.p0"):
+            from lib.git_ops import build_revision_range
+            rev = build_revision_range(
+                "release-4.21", "4.21.7", "abc1234")
+            self.assertIn("4.21.7-202603230928.p0", rev)
+            self.assertNotIn("abc1234", rev)
+
+    def test_commit_used_when_no_tag(self):
+        from unittest.mock import patch
+        with patch("lib.git_ops.find_version_tag", return_value=None):
+            from lib.git_ops import build_revision_range
+            rev = build_revision_range(
+                "release-4.21", "4.21.11", "7f7539e")
+            self.assertEqual(rev, "7f7539e..origin/release-4.21")
+
+    def test_full_branch_when_nothing(self):
+        from unittest.mock import patch
+        with patch("lib.git_ops.find_version_tag", return_value=None):
+            from lib.git_ops import build_revision_range
+            rev = build_revision_range("release-4.21", None, None)
+            self.assertEqual(rev, "origin/release-4.21")
 
 
 if __name__ == "__main__":

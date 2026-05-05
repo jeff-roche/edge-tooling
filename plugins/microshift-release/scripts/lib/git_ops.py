@@ -178,25 +178,85 @@ def find_version_tag(version):
     return tags[0]
 
 
-def commits_since(branch, since_version):
-    """Get commits on origin/<branch> since a version tag.
+def find_nearest_version_tag(minor_version, max_z):
+    """Find the nearest available version tag, searching from max_z down.
+
+    When the exact tag for a version doesn't exist (e.g., ART hasn't pushed
+    it yet), this tries previous z-stream versions until it finds one.
+
+    Args:
+        minor_version: e.g., "4.21".
+        max_z: Starting z-stream number to search from, e.g., 11.
+
+    Returns:
+        tuple[str, str] or tuple[None, None]: (version, tag) if found.
+    """
+    for z in range(max_z, -1, -1):
+        version = f"{minor_version}.{z}"
+        tag = find_version_tag(version)
+        if tag:
+            return version, tag
+    return None, None
+
+
+def build_revision_range(branch, since_version=None, since_commit=None):
+    """Build a git revision range for log/diff commands.
+
+    Resolves the best available range base: version tag first, then
+    since_commit hash, then the full branch.
+
+    Args:
+        branch: Branch name, e.g., "release-4.21".
+        since_version: Version string to look up a tag for, or None.
+        since_commit: Git commit hash fallback when no tag exists.
+
+    Returns:
+        str: Revision range, e.g., "tag..origin/branch" or "origin/branch".
+    """
+    tag = find_version_tag(since_version) if since_version else None
+    if tag:
+        return f"{tag}..origin/{branch}"
+    if since_commit:
+        return f"{since_commit}..origin/{branch}"
+    logger.warning("No tag or commit baseline for %s — using full branch history", branch)
+    return f"origin/{branch}"
+
+
+def verify_commit_exists(commit_hash):
+    """Check if a commit hash exists in the local MicroShift clone.
+
+    Args:
+        commit_hash: Short or full git commit hash.
+
+    Returns:
+        bool: True if the commit exists.
+    """
+    repo = ensure_microshift_repo()
+    result = subprocess.run(
+        ["git", "cat-file", "-t", commit_hash],
+        cwd=repo, capture_output=True, text=True,
+    )
+    return result.returncode == 0 and result.stdout.strip() == "commit"
+
+
+def commits_since(branch, since_version, since_commit=None):
+    """Get commits on origin/<branch> since a version tag or commit.
 
     Uses a tag-based range (tag..origin/branch) to count only commits
     after the specified version, rather than a time-based --since filter.
+    Falls back to since_commit if provided and no tag is found.
 
     Args:
         branch: Branch name, e.g., "release-4.21".
         since_version: Version string, e.g., "4.18.36", or None to get
             all commits on the branch.
+        since_commit: Git commit hash to use as range base when the
+            version tag is unavailable.
 
     Returns:
         list[dict]: Each dict has keys: sha, subject, date.
     """
-    tag = find_version_tag(since_version) if since_version else None
-    if tag:
-        revision = f"{tag}..origin/{branch}"
-    else:
-        revision = f"origin/{branch}"
+    revision = build_revision_range(branch, since_version, since_commit)
 
     repo = ensure_microshift_repo()
     result = subprocess.run(
