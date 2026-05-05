@@ -38,13 +38,16 @@ is not available, stop and show setup instructions (see `create-rhel-stories`
 skill for reference).
 
 Additional requirements:
+
 1. SSH access to a hypervisor running a TNF cluster (via two-node-toolbox)
 2. The RPM with the fix downloaded locally (typically in `~/Downloads/`)
 
 Determine the hypervisor IP:
+
 ```bash
 cd two-node-toolbox/deploy && make info 2>/dev/null | grep "Host:" | awk '{print $2}'
 ```
+
 If `two-node-toolbox/` is not at the repo root, ask the user for the
 hypervisor IP.
 
@@ -59,6 +62,7 @@ SCRIPTS_DIR=${PLUGIN_DIR}/scripts
 ```
 
 Available scripts:
+
 - `verify-cluster.sh` — Cluster health check (OCP, nodes, pcs, etcd, RPM versions)
 - `patch-nodes.sh <path-to-rpm> [grep-pattern]` — RPM patching with persistent override + reboot + verification
 - `collect-logs.sh [minutes-ago] [output-dir]` — Collect pacemaker/etcd logs from both nodes
@@ -77,7 +81,7 @@ automatically. Only ask the user for what can't be derived from Jira.
 
 ### Step 1a: Fetch the RHEL Ticket
 
-```
+```text
 mcp__mcp-atlassian__jira_get_issue(
   issue_key="<RHEL-XXXXX>",
   fields="summary,status,description,fixVersions,issuelinks,components,priority,customfield_10879,customfield_10638",
@@ -86,6 +90,7 @@ mcp__mcp-atlassian__jira_get_issue(
 ```
 
 Extract:
+
 - **Bug title** — from `summary`
 - **Target z-stream** — from `fixVersions` (e.g., `rhel-9.8.z`)
 - **RPM NVR** — from `Fixed in Build` field or `fixVersions` context
@@ -99,8 +104,9 @@ Extract:
 From the RHEL ticket's `issuelinks`, identify and fetch:
 
 **Parent/upstream bug** — look for links of type "is cloned by" or "clones"
-pointing to OCPBUGS-* or another RHEL-* ticket. Fetch it:
-```
+pointing to OCPBUGS or another RHEL ticket. Fetch it:
+
+```text
 mcp__mcp-atlassian__jira_get_issue(
   issue_key="<OCPBUGS-XXXXX>",
   fields="summary,description,issuelinks,fixVersions,components",
@@ -109,6 +115,7 @@ mcp__mcp-atlassian__jira_get_issue(
 ```
 
 From the upstream bug, extract:
+
 - **Upstream PR** — scan description and comments for GitHub PR links
   (e.g., `github.com/ClusterLabs/resource-agents/pull/XXXX` or
   `ClusterLabs/resource-agents#XXXX`)
@@ -117,8 +124,9 @@ From the upstream bug, extract:
 - Additional test instructions from developer comments
 
 **OCPEDGE tracking ticket** — look for links of type "Relates" or
-"is related to" pointing to OCPEDGE-* tickets. If found, fetch it:
-```
+"is related to" pointing to OCPEDGE tickets. If found, fetch it:
+
+```text
 mcp__mcp-atlassian__jira_get_issue(
   issue_key="<OCPEDGE-XXXXX>",
   fields="summary,status,customfield_10020",
@@ -127,10 +135,11 @@ mcp__mcp-atlassian__jira_get_issue(
 ```
 
 From the OCPEDGE ticket, extract:
+
 - **Sprint** — from `customfield_10020` (sprint field) or the ticket summary
 - **Tracking ticket key** — the OCPEDGE ticket itself
 
-**Sibling clones** — if the RHEL ticket has clone links to other RHEL-*
+**Sibling clones** — if the RHEL ticket has clone links to other RHEL
 tickets (same fix, different z-streams), note them for context. These are
 other z-stream verifications of the same fix.
 
@@ -160,9 +169,11 @@ Only ask for what wasn't found in Jira:
 1. **RPM to test** — ask: "What's the RPM filename? (e.g.,
    resource-agents-4.10.0-108.el9_8.2.x86_64.rpm)"
    Then check if the RPM exists in `~/Downloads/` automatically:
+
    ```bash
    ls ~/Downloads/*resource-agents* 2>/dev/null
    ```
+
    If multiple matches, ask the user to pick one.
 
 2. **Target z-stream** — only if not found in `fixVersions`. Use
@@ -192,6 +203,7 @@ Only ask for what wasn't found in Jira:
 ### Step 2: Check Cluster State
 
 Run the cluster health check script:
+
 ```bash
 export HYPERVISOR="<ip>" && bash "${PLUGIN_DIR}/scripts/verify-cluster.sh"
 ```
@@ -205,6 +217,7 @@ z-stream. Present the status to the user:
 - If no cluster: "No cluster running. You'll need to deploy one."
 
 If a cluster change is needed, present options via AskUserQuestion:
+
 - Redeploy cluster (update config_fencing.sh and `make redeploy-cluster`)
 - Deploy from scratch (`make clean && make fencing-ipi`)
 - Apply osImageStream rebase (for RHEL 10 targets)
@@ -218,11 +231,13 @@ what's needed. Cluster lifecycle is the user's responsibility.
 Only proceed if the cluster is ready and the RPM is available locally.
 
 Run the patching script:
+
 ```bash
 export HYPERVISOR="<ip>" && bash "${PLUGIN_DIR}/scripts/patch-nodes.sh" ~/Downloads/<rpm-file> [grep-pattern]
 ```
 
 The script will:
+
 1. Copy RPM to hypervisor, then to both nodes
 2. Apply `rpm-ostree override replace -C` on both nodes
 3. Reboot both nodes
@@ -265,11 +280,13 @@ based on the bug description. Common patterns:
 | Log counting | `grep -c "<pattern>" /var/log/pacemaker/pacemaker.log` |
 
 All commands must be run via SSH through the hypervisor:
+
 ```bash
 ssh ec2-user@${HYPERVISOR} "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@192.168.111.20 '<command>'"
 ```
 
 After each test:
+
 - Collect relevant logs from `/var/log/pacemaker/pacemaker.log`
 - Check etcd configuration logs (ETCD_NAME, ETCD_INITIAL_CLUSTER, etc.)
 - Verify cluster health (`pcs status`, etcd member list, etcd endpoint health)
@@ -280,6 +297,7 @@ or fencing nodes.
 #### Log Collection
 
 Use the log collection script when you need a full log dump:
+
 ```bash
 export HYPERVISOR="<ip>" && bash "${PLUGIN_DIR}/scripts/collect-logs.sh" [minutes-ago]
 ```
@@ -291,8 +309,8 @@ Default is 30 minutes. Logs are saved to `/tmp/bugfix-verify-logs/<timestamp>/`.
 1. Compile all results into a JIRA comment using Markdown format.
    Use this structure:
 
-   ```
-   ### Verification of <JIRA-ID> - <Bug Title>
+   ```markdown
+   ### Verification of RHEL-XXXXX - Bug Title
 
    #### Environment
    - **OCP Version:** <version>
@@ -324,15 +342,16 @@ Default is 30 minutes. Logs are saved to `/tmp/bugfix-verify-logs/<timestamp>/`.
    <One paragraph verdict>
    ```
 
-2. Save the report to `/tmp/rhel-bugfix-verify-<JIRA-ID>/report.txt`
+2. Save the report to `/tmp/rhel-bugfix-verify-RHEL-XXXXX/report.txt`
 
 3. Present the report to the user for review.
 
 4. Ask if they want to post the comment to JIRA automatically:
-   > "Post this report as a comment on <JIRA-ID>? (yes/no)"
+   > "Post this report as a comment on RHEL-XXXXX? (yes/no)"
 
    If yes:
-   ```
+
+   ```text
    mcp__mcp-atlassian__jira_add_comment(
      issue_key="<RHEL-XXXXX>",
      comment="<report content>"

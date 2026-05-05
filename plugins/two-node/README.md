@@ -47,6 +47,7 @@ Create OCPEDGE stories for TNF RHEL verification tickets, link them to the RHEL 
 ```
 
 **Features:**
+
 - Auto-discovery of untested TNF resource-agents RHEL tickets
 - Clone expansion across the full clone tree
 - Dry-run mode for previewing without modifying Jira
@@ -71,11 +72,13 @@ Verify a RHEL resource-agents bug fix on a TNF cluster. Given a JIRA ID, the ski
 5. **Generate report** — Produces a Markdown JIRA comment with environment, fix details, test results, and conclusion. Optionally posts it to the RHEL ticket via MCP.
 
 **Scripts** (in `scripts/`):
+
 - `verify-cluster.sh` — Cluster health check (OCP, nodes, pcs, etcd, RPM versions)
 - `patch-nodes.sh` — RPM patching with persistent override + reboot + verification
 - `collect-logs.sh` — Collect pacemaker/etcd logs from both nodes
 
 **Prerequisites:**
+
 - SSH access to a hypervisor running a TNF cluster
 - RPM with the fix downloaded locally (typically `~/Downloads/`)
 - `HYPERVISOR` env var or `two-node-toolbox/` submodule available for auto-detection
@@ -99,10 +102,12 @@ One argument: a Jira issue key. The skill handles everything else:
 The cluster is **always left running** after the skill completes so the user can SSH in and inspect.
 
 **Supported topologies:**
+
 - **arbiter** -- Two-Node with Arbiter (TNA): 2 masters + 1 arbiter node
 - **fencing** -- Two-Node with Fencing (TNF): 2 masters with BMC-based fencing
 
 **Output:**
+
 - Logs saved to `/tmp/two-node-bug-reproduce-<BUG_ID>/`
 - Findings report written to `docs/<bug-id-lowercase>-findings.md` in the TNT repo (e.g., `docs/ocpbugs-66217-findings.md`)
 - Cluster left running for manual inspection
