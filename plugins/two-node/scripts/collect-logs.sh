@@ -22,6 +22,10 @@ set -euo pipefail
 
 MINUTES_AGO="${1:-30}"
 OUTPUT_BASE="${2:-/tmp/bugfix-verify-logs}"
+if ! [[ "$MINUTES_AGO" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: minutes-ago must be a non-negative integer"
+    exit 1
+fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="${SCRIPT_DIR}/../../.."
 TNT_DEPLOY_DIR="${REPO_ROOT}/two-node-toolbox/deploy"

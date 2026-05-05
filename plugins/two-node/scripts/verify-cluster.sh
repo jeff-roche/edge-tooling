@@ -48,8 +48,8 @@ ssh "ec2-user@${HYPERVISOR}" "
     oc get nodes 2>&1
     echo ''
 
-    echo '=== Cluster Operators Not Available ==='
-    oc get co 2>&1 | awk 'NR==1 || /False/' | head -20
+    echo '=== Cluster Operators Not Healthy ==='
+    oc get co 2>&1 | awk 'NR==1 || \$3 != \"True\" || \$4 != \"False\" || \$5 != \"False\"' | head -20
     echo ''
 
     echo '=== OS Version ==='
