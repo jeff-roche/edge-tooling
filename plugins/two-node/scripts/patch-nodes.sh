@@ -15,6 +15,7 @@
 #   5. Verifies the RPM version after reboot
 #   6. Optionally verifies fix code presence
 
+# shellcheck disable=SC2029
 set -euo pipefail
 
 RPM_PATH="${1:?Usage: $0 <path-to-rpm> [grep-pattern-for-fix]}"

@@ -16,6 +16,7 @@
 #   - etcd endpoint health
 #   - resource-agents RPM version on both nodes
 
+# shellcheck disable=SC2029
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

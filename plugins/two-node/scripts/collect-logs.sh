@@ -17,6 +17,7 @@
 #   - Full pacemaker journal (last N minutes)
 #   - etcd initial cluster config from pacemaker.log
 
+# shellcheck disable=SC2029
 set -euo pipefail
 
 MINUTES_AGO="${1:-30}"
