@@ -59,9 +59,14 @@ echo "=== Applying rpm-ostree override replace -C ==="
 for node in "$MASTER_0" "$MASTER_1"; do
     node_name="master-$(echo "$node" | awk -F. '{print $4 - 20}')"
     echo "--- ${node_name} ---"
-    ssh "ec2-user@${HYPERVISOR}" "
-        ssh ${SSH_OPTS} core@${node} 'sudo rpm-ostree override replace /tmp/${RPM_FILE} -C' 2>&1 | grep -v '^Warning:'
-    "
+    raw_output="$(ssh "ec2-user@${HYPERVISOR}" \
+        "ssh ${SSH_OPTS} core@${node} 'sudo rpm-ostree override replace /tmp/${RPM_FILE} -C'" 2>&1)"
+    rc=$?
+    printf '%s\n' "$raw_output" | grep -v '^Warning:' || true
+    if [ "$rc" -ne 0 ]; then
+        echo "ERROR: rpm-ostree override failed on ${node_name}"
+        exit "$rc"
+    fi
     echo ""
 done
 
