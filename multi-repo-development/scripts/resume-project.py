@@ -333,7 +333,7 @@ def resolve_project(arg: str | None, root: Path) -> dict:
                 "status": fm.get("status", ""),
                 "jira": fm.get("jira", ""),
                 "repos": repos_list,
-                "related_links": fm.get("related_links", []),
+                "related_links": fm.get("related_links") or [],
             },
             "reference_files": ref_files,
             "has_reference_files": bool(ref_files),
