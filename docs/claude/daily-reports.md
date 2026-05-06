@@ -4,7 +4,7 @@ The `edge-ic` plugin provides tools for validating daily standup format before p
 
 ## Daily Standup Format Rules
 
-When generating daily reports for Slack:
+When generating daily standup for Slack:
 
 1. **Include a header line** (e.g., "Daily Report:") at the top for proper `/copy` command alignment
 2. **Use correct emoji format**:
