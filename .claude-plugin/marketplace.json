@@ -89,6 +89,12 @@
       "source": "./plugins/edge-ic",
       "description": "Individual contributor workflow automation for TODO management, status reporting, and Jira updates",
       "version": "1.0.0"
+    },
+    {
+      "name": "skills-review",
+      "source": "./plugins/skills-review",
+      "description": "Lint SKILL.md files for quality, correctness, and adherence to skill guidelines",
+      "version": "1.0.0"
     }
   ]
 }
