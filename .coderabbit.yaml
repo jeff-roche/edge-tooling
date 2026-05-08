@@ -1,3 +1,5 @@
+inheritance: true
+
 language: en-US
 
 reviews:
@@ -9,8 +11,12 @@ reviews:
   review_status: true
   changed_files_summary: true
   collapse_walkthrough: false
-  request_changes_workflow: false
+  request_changes_workflow: true
   abort_on_close: true
+  auto_apply_labels: true
+  labeling_instructions:
+    - label: "ready-for-human-review"
+      instructions: "Apply when CodeRabbit approves the PR with no outstanding comments or requested changes."
 
   auto_review:
     enabled: true
