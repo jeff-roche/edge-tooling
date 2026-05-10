@@ -138,7 +138,7 @@ Compute once at the start by running `date +%y%m%d` and substituting into the pa
 
 3. Launch all create-bugs agents in a **single message** as **foreground** agents (do NOT use `run_in_background`). They run concurrently.
 4. Each agent produces `<WORKDIR>/analyze-ci-bugs-<source>.json`
-5. When all agents return, immediately proceed to Step 4 in the same turn. Do NOT stop or end your turn between Step 3 and Step 4.
+5. When all agents return, immediately proceed to Step 3b in the same turn. Do NOT stop or end your turn between Step 3 and Step 3b.
 
 **Error Handling**:
 
@@ -190,6 +190,8 @@ Compute once at the start by running `date +%y%m%d` and substituting into the pa
 **Error Handling**:
 
 - If the JIRA query fails, log the error and continue — the Bugs tab will degrade gracefully to showing only bugs linked to current failures.
+
+When Step 3b completes, immediately proceed to Step 4. Do NOT stop or end your turn between Step 3b and Step 4.
 
 ### Step 4: Finalize — Aggregate and Generate HTML Report
 
