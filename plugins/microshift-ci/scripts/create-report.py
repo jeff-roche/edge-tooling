@@ -370,7 +370,7 @@ def _collect_linked_bugs(bug_data, pr_bug_paths):
 
     Returns (linked, details) where:
     - linked: dict mapping JIRA key to list of {release, error_signature, affected_jobs}
-    - details: dict mapping JIRA key to {summary, status} from the mapping file
+    - details: dict mapping JIRA key to {summary, status, updated} from the mapping file
     """
     linked = {}
     details = {}
@@ -387,7 +387,7 @@ def _collect_linked_bugs(bug_data, pr_bug_paths):
                     "affected_jobs": cand.get("affected_jobs", 0),
                 })
                 if key not in details:
-                    details[key] = {"summary": dup.get("summary", ""), "status": dup.get("status", "")}
+                    details[key] = {"summary": dup.get("summary", ""), "status": dup.get("status", ""), "updated": dup.get("updated", "")}
 
     for path in pr_bug_paths:
         for cand in load_bug_candidates(path):
@@ -401,9 +401,21 @@ def _collect_linked_bugs(bug_data, pr_bug_paths):
                     "affected_jobs": cand.get("affected_jobs", 0),
                 })
                 if key not in details:
-                    details[key] = {"summary": dup.get("summary", ""), "status": dup.get("status", "")}
+                    details[key] = {"summary": dup.get("summary", ""), "status": dup.get("status", ""), "updated": dup.get("updated", "")}
 
     return linked, details
+
+
+def _pick_bug_fields(issue, links=None):
+    entry = {
+        "key": issue.get("key", ""),
+        "summary": issue.get("summary", ""),
+        "status": issue.get("status", ""),
+        "updated": issue.get("updated", ""),
+    }
+    if links is not None:
+        entry["links"] = links
+    return entry
 
 
 def build_bugs_tab_data(open_bugs_data, bug_data, pr_bug_paths):
@@ -418,27 +430,16 @@ def build_bugs_tab_data(open_bugs_data, bug_data, pr_bug_paths):
         for issue in open_bugs_data["issues"]:
             key = issue["key"]
             seen_keys.add(key)
-            entry = dict(issue)
             if key in linked_map:
-                entry["links"] = linked_map[key]
-                linked.append(entry)
+                linked.append(_pick_bug_fields(issue, linked_map[key]))
             else:
-                unlinked.append(entry)
+                unlinked.append(_pick_bug_fields(issue))
 
         # Keys in mapping files but not in open bugs query
         for key, links in linked_map.items():
             if key not in seen_keys:
-                det = linked_details.get(key, {})
-                linked.append({
-                    "key": key,
-                    "summary": det.get("summary", ""),
-                    "status": det.get("status", ""),
-                    "priority": "",
-                    "assignee": "",
-                    "created": "",
-                    "updated": "",
-                    "links": links,
-                })
+                det = dict(linked_details.get(key, {}), key=key)
+                linked.append(_pick_bug_fields(det, links))
 
         return {
             "total_open": len(open_bugs_data["issues"]),
@@ -450,17 +451,8 @@ def build_bugs_tab_data(open_bugs_data, bug_data, pr_bug_paths):
     # Graceful degradation: no open bugs file, use mapping files only
     linked = []
     for key, links in linked_map.items():
-        det = linked_details.get(key, {})
-        linked.append({
-            "key": key,
-            "summary": det.get("summary", ""),
-            "status": det.get("status", ""),
-            "priority": "",
-            "assignee": "",
-            "created": "",
-            "updated": "",
-            "links": links,
-        })
+        det = dict(linked_details.get(key, {}), key=key)
+        linked.append(_pick_bug_fields(det, links))
     return {
         "total_open": 0,
         "linked": linked,
@@ -1193,9 +1185,13 @@ def main():
     all_pr_bugs = _index_pr_bugs(pr_entry["bugs"], known_pr_nums)
     pr_error = pr_entry.get("error")
 
-    # Load open bugs data and build bugs tab
+    # Load open bugs data, build bugs tab, and persist summary
     open_bugs_data = load_json(files["open_bugs"])
     bugs_tab_data = build_bugs_tab_data(open_bugs_data, bug_data, pr_entry["bugs"])
+
+    bugs_summary_path = os.path.join(workdir, "analyze-ci-bugs-summary.json")
+    with open(bugs_summary_path, "w") as f:
+        json.dump(bugs_tab_data, f, indent=2)
 
     # Set graphs directory for rendering
     global _GRAPHS_DIR
