@@ -53,7 +53,7 @@ install_google_cloud_cli() {
   /opt/google-cloud-sdk/install.sh --quiet --path-update false
   for bin in gcloud gcloud-crc32c gsutil; do
     if [ ! -f "/usr/local/bin/${bin}" ]; then
-      ln -sf /opt/google-cloud-sdk/bin/${bin} /usr/local/bin/${bin}
+      ln -sf "/opt/google-cloud-sdk/bin/${bin}" "/usr/local/bin/${bin}"
     fi
   done
   rm -f "${gcloud_archive}"
