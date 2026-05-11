@@ -519,7 +519,7 @@ def render_bugs_section(bugs_data):
 
     lines.append('        <div class="release-section">')
     lines.append('            <div class="release-header">')
-    lines.append('                <h2>Open AI-Generated Bugs</h2>')
+    lines.append('                <h2>AI-Generated Bugs</h2>')
     lines.append('            </div>')
     lines.append('            <div class="overview-grid">')
     lines.append('                <div class="overview-card">')
