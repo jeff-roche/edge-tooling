@@ -407,5 +407,4 @@ Extracts `RHEL-150700` from the URL and runs the same workflow.
   have a running TNF cluster before invoking.
 - Only resource-agents bugs on TNF clusters are supported. For TNA (arbiter)
   topology or other components, use `/two-node:bug-reproducer` instead.
-- Reports from past verifications in `~/Documents/claude_test_file/` can be
-  used as format reference if available.
+- Reports from past verifications can be used as format reference if available.

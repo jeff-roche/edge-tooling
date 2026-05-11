@@ -114,8 +114,9 @@ echo ""
 # Step 7: Verify fix code (optional)
 if [ -n "$FIX_GREP_PATTERN" ]; then
     echo "=== Verifying fix code presence ==="
+    safe_pattern=$(printf '%q' "$FIX_GREP_PATTERN")
     ssh "ec2-user@${HYPERVISOR}" "
-        ssh ${SSH_OPTS} core@${MASTER_1} \"grep -n '${FIX_GREP_PATTERN}' /usr/lib/ocf/resource.d/heartbeat/podman-etcd\"
+        ssh ${SSH_OPTS} core@${MASTER_1} \"grep -n ${safe_pattern} /usr/lib/ocf/resource.d/heartbeat/podman-etcd\"
     " 2>/dev/null
     echo ""
 fi

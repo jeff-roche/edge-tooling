@@ -53,7 +53,8 @@ ssh "ec2-user@${HYPERVISOR}" "
     echo ''
 
     echo '=== OS Version ==='
-    ssh ${SSH_OPTS} core@${MASTER_0} 'cat /etc/os-release | head -3' 2>/dev/null
+    echo -n 'master-0: ' && ssh ${SSH_OPTS} core@${MASTER_0} 'grep PRETTY_NAME /etc/os-release' 2>/dev/null
+    echo -n 'master-1: ' && ssh ${SSH_OPTS} core@${MASTER_1} 'grep PRETTY_NAME /etc/os-release' 2>/dev/null
     echo ''
 
     echo '=== resource-agents RPM ==='
