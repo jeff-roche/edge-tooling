@@ -348,7 +348,7 @@ mode_close_duplicates() {
     fi
 
     for i in $(seq 0 $((group_count - 1))); do
-        local group newest_number newest_title group_key
+        local group newest_number newest_title
         group=$(echo "${groups}" | jq -c ".[$i]")
         newest_number=$(echo "${group}" | jq '.[0].number')
         newest_title=$(echo "${group}" | jq -r '.[0].title')
