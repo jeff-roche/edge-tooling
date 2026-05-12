@@ -331,18 +331,11 @@ mode_close_duplicates() {
 
     [[ "$(echo "${pr_data}" | jq 'length')" -eq 0 ]] && { echo "No matching PRs found."; return; }
 
-    # Group by (target branch, title prefix up to the token after --filter).
-    # E.g. filter="rebase-release-", title="NO-ISSUE: rebase-release-4.19-..."
-    #   → group key = "release-4.19|rebase-release-4.19"
+    # Group by target branch. All PRs matching the filter on the same
+    # branch are considered duplicates of each other.
     local groups
-    groups=$(echo "${pr_data}" | jq -c --arg f "${filter}" '
-        [.[] | . + {
-            group_key: (
-                .baseRefName + "|" +
-                (.title | capture("(?<k>" + $f + "[^- ]+)") | .k)
-            )
-        }]
-        | group_by(.group_key)
+    groups=$(echo "${pr_data}" | jq -c '
+        group_by(.baseRefName)
         | map(select(length > 1) | sort_by(.number) | reverse)
     ')
 
@@ -359,9 +352,10 @@ mode_close_duplicates() {
         group=$(echo "${groups}" | jq -c ".[$i]")
         newest_number=$(echo "${group}" | jq '.[0].number')
         newest_title=$(echo "${group}" | jq -r '.[0].title')
-        group_key=$(echo "${group}" | jq -r '.[0].group_key')
+        local base_ref
+        base_ref=$(echo "${group}" | jq -r '.[0].baseRefName')
 
-        echo "${group_key}: keeping PR #${newest_number} (${newest_title})"
+        echo "${base_ref}: keeping PR #${newest_number} (${newest_title})"
 
         local dup_count
         dup_count=$(echo "${group}" | jq 'length - 1')
@@ -372,15 +366,14 @@ mode_close_duplicates() {
             dup_title=$(echo "${group}" | jq -r ".[$j].title")
 
             local comment="Closing as duplicate: superseded by #${newest_number}."
-            comment+=$'\n'"${SIGNATURE}"
+            comment+=$'\n'"/close"
+            comment+="${SIGNATURE}"
 
             echo "  Closing PR #${dup_number} (${dup_title})..."
             if ${execute}; then
                 gh pr comment "${dup_number}" --repo "${GH_REPO}" --body "${comment}"
-                gh pr close "${dup_number}" --repo "${GH_REPO}"
             else
                 echo "  gh pr comment ${dup_number} --repo ${GH_REPO} --body '${comment}'"
-                echo "  gh pr close ${dup_number} --repo ${GH_REPO}"
             fi
         done
     done
@@ -393,10 +386,9 @@ usage() {
     echo "    detail:            JSON array of PRs with full job lists" >&2
     echo "    approve:           Approve PRs where ALL test jobs passed (dry-run by default)" >&2
     echo "    restart:           Restart failed test jobs by commenting /test (dry-run by default)" >&2
-    echo "    close-duplicates:  Close older PRs with same target branch and title prefix (dry-run by default)" >&2
-    echo "                       Requires --filter and --author. PRs are grouped by target branch +" >&2
-    echo "                       title text up to the token after FILTER (e.g. 'rebase-release-' groups" >&2
-    echo "                       by 'rebase-release-X.Y')" >&2
+    echo "    close-duplicates:  Close older PRs with same target branch and title filter (dry-run by default)" >&2
+    echo "                       Requires --filter and --author. PRs matching the filter are grouped by" >&2
+    echo "                       target branch; the newest PR in each group is kept, older ones are closed" >&2
     echo "  --filter STRING:   Only include PRs whose title contains STRING" >&2
     echo "  --author USER:     Only include PRs authored by USER" >&2
     echo "  --execute:         Actually post comments/close PRs (action modes). Without this flag, only shows what would be done." >&2
