@@ -167,7 +167,19 @@ If results are found, fetch their details with `mcp__jira__jira_get_issue` and f
 
 **Note**: Run searches in parallel where possible.
 
-**After completing Jira searches for ALL per-source candidates**, write machine-readable bug mapping files per source. For each source in `SOURCES`, write `<WORKDIR>/analyze-ci-bugs-<source>.json` using this JSON format:
+**Query for open AI-generated bugs**: After completing all per-candidate searches, run one additional query to fetch all open bugs with the `microshift-ci-ai-generated` label:
+
+```text
+mcp__jira__jira_search(
+  jql="project = USHIFT AND issuetype = Bug AND labels = microshift-ci-ai-generated AND status not in (Closed, Verified) ORDER BY updated DESC",
+  fields="summary,status,priority,assignee,created,updated",
+  limit=50
+)
+```
+
+If more than 50 results, paginate with `start_at` until all issues are fetched. For each issue, extract: `key`, `summary`, status name, priority name, assignee display name, `created` and `updated` truncated to date only (first 10 characters).
+
+**After completing all Jira searches**, write machine-readable bug mapping files per source. For each source in `SOURCES`, write `<WORKDIR>/analyze-ci-bugs-<source>.json` using this JSON format:
 
 ```json
 {
@@ -186,6 +198,17 @@ If results are found, fetch their details with `mcp__jira__jira_get_issue` and f
       "regressions": [
         {"key": "<JIRA-KEY>", "summary": "<summary>", "status": "<status>", "updated": "<YYYY-MM-DD>"}
       ]
+    }
+  ],
+  "open_bugs": [
+    {
+      "key": "USHIFT-1234",
+      "summary": "...",
+      "status": "In Progress",
+      "priority": "Normal",
+      "assignee": "jdoe",
+      "created": "2026-05-01",
+      "updated": "2026-05-09"
     }
   ]
 }
