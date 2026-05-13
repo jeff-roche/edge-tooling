@@ -12,11 +12,11 @@
 A periodic Prow job (`periodic-ci-openshift-eng-edge-tooling-main-microshift-ci-doctor`)
 runs daily and performs three phases automatically:
 
-1. **Analysis** — `/microshift-ci:doctor 4.18,4.19,4.20,4.21,4.22,5.0,main`
+1. **Analysis** - `/microshift-ci:doctor 4.18,4.19,4.20,4.21,4.22,5.0,main`
    (50 min budget, 100 turns)
-2. **Bug creation dry-run** — `/microshift-ci:create-bugs <releases>`
+2. **Bug creation dry-run** - `/microshift-ci:create-bugs <releases>`
    (10 min budget, 50 turns)
-3. **Rebase PR restart** — automatically restarts failed rebase bot PR tests
+3. **Rebase PR restart** - automatically restarts failed rebase bot PR tests
 
 The job produces an HTML report, per-job analysis files, bug mapping JSON,
 and a session archive for local continuation. All artifacts are available
@@ -24,29 +24,33 @@ in the Prow job's artifact directory.
 
 ## Daily Workflow
 
-Start from the CI job results — don't re-run doctor locally.
+Start from the CI job results - don't re-run doctor locally.
 
 ### 1. Open the CI job
 
-Find the latest run at:
+Find the latest run at
+[MicroShift CI Doctor](https://prow.ci.openshift.org/?job=periodic-ci-openshift-eng-edge-tooling-main-microshift-ci-doctor).
 
-```text
-https://prow.ci.openshift.org/?job=periodic-ci-openshift-eng-edge-tooling-main-microshift-ci-doctor
-```
-
-Open the artifacts tab. The HTML report (`0-microshift-ci-doctor-report-summary.html`)
-is the entry point — it shows all failures grouped by release with JIRA correlation.
+The Prow Spyglass of a job page contains the `MicroShift CI Doctor Report`
+section, which is the main entry point. The report shows all failures grouped
+by release with JIRA correlation.
 
 ### 2. Continue locally
 
-Download the CI session artifacts into a local workdir:
+The Prow Spyglass of a job page contains the `Continue This MicroShift CI Session Locally`
+section, containing the command for downloading the CI session artifacts into
+a local working directory:
 
 ```text
 /microshift-ci:continue-session <prow-job-url>
 ```
 
-This sets up the same workdir layout the CI job used, so all subsequent
+This sets up the same working directory layout the CI job used, so all subsequent
 commands work on the downloaded data.
+
+> Note: Only analysis files are downloaded - raw prow job artifacts
+> (build logs, SOS reports) are not included. Use `/microshift-ci:prow-job`
+> to fetch those for specific jobs.
 
 ### 3. Review bug candidates
 
@@ -74,9 +78,9 @@ Drop `--auto` for interactive per-candidate prompts.
 /microshift-ci:test-scenario <prow-url> <scenario-name>
 ```
 
-- `prow-job` — root cause analysis of a single failed job
-- `test-job` — comprehensive job metadata and all scenario results
-- `test-scenario` — deep dive into one scenario's test results
+- `prow-job` - root cause analysis of a single failed job
+- `test-job` - comprehensive job metadata and all scenario results
+- `test-scenario` - deep dive into one scenario's test results
 
 ### 6. Refresh report after changes
 
