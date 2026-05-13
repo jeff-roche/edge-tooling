@@ -5,5 +5,15 @@
   "author": { "name": "jaypoulz" },
   "homepage": "https://github.com/openshift-eng/edge-tooling",
   "license": "Apache-2.0",
-  "category": "util"
+  "category": "util",
+  "commands": [
+    {
+      "name": "daily-add",
+      "description": "Add a task to today's TODO file"
+    },
+    {
+      "name": "daily-update",
+      "description": "Update today's TODO file based on conversation progress"
+    }
+  ]
 }
