@@ -8,6 +8,10 @@
   "category": "util",
   "commands": [
     {
+      "name": "daily-add",
+      "description": "Add a task to today's TODO file"
+    },
+    {
       "name": "daily-update",
       "description": "Update today's TODO file based on conversation progress"
     }
