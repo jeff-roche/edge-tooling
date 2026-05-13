@@ -255,6 +255,7 @@ This writes `<WORKDIR>/analyze-ci-bug-candidates-merged.json`. Read and use this
        Would create: N
        Would skip (Jira duplicate): N
        Would skip (infrastructure): N
+       Would skip (stale regression): N
 
      To create these bugs, run:
        /microshift-ci:create-bugs <sources> --create
