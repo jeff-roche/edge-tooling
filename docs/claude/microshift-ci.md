@@ -16,7 +16,8 @@ runs daily and performs three phases automatically:
    (50 min budget, 100 turns)
 2. **Bug creation dry-run** - `/microshift-ci:create-bugs <releases>`
    (10 min budget, 50 turns)
-3. **Rebase PR restart** - automatically restarts failed rebase bot PR tests
+3. **Close duplicate rebase PRs** - closes older rebase PRs superseded by newer ones
+4. **Rebase PR restart** - restarts failed rebase bot PR tests
 
 The job produces an HTML report, per-job analysis files, bug mapping JSON,
 and a session archive for local continuation. All artifacts are available
@@ -93,10 +94,20 @@ job analysis files (does not re-analyze jobs).
 
 ## PR Job Management
 
-The CI job automatically restarts failed rebase bot PR tests.
-To run manually:
+The CI job automatically closes duplicate rebase PRs and restarts failed
+rebase bot PR tests. To run manually:
 
 ```bash
+# Close duplicate rebase PRs (dry-run)
+bash plugins/microshift-ci/scripts/prow-jobs-for-pull-requests.sh \
+  --mode close-duplicates --author 'microshift-rebase-script[bot]' \
+  --filter 'NO-ISSUE: rebase-release'
+
+# Close duplicate rebase PRs (execute)
+bash plugins/microshift-ci/scripts/prow-jobs-for-pull-requests.sh \
+  --mode close-duplicates --author 'microshift-rebase-script[bot]' \
+  --filter 'NO-ISSUE: rebase-release' --execute
+
 # Restart failed rebase PR jobs (dry-run)
 bash plugins/microshift-ci/scripts/prow-jobs-for-pull-requests.sh \
   --mode restart --author 'microshift-rebase-script[bot]'
