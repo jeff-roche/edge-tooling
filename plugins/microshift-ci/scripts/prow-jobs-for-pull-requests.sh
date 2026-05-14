@@ -14,10 +14,14 @@ GCS_PR_PREFIX="pr-logs/pull/openshift_microshift"
 SIGNATURE=$'\n'"*Added by $(basename "${0}")* :robot:"$'\n'
 
 # Get open PRs as JSON array
+# Args: filter, author, extra_fields (comma-separated, appended to default fields)
 fetch_open_prs() {
     local filter="${1:-}"
     local author="${2:-}"
-    local -a gh_args=(--repo "${GH_REPO}" --state open --limit 100 --json "number,title,url")
+    local extra_fields="${3:-}"
+    local fields="number,title,url"
+    [[ -n "${extra_fields}" ]] && fields+=",${extra_fields}"
+    local -a gh_args=(--repo "${GH_REPO}" --state open --limit 100 --json "${fields}")
 
     [[ -n "${author}" ]] && gh_args+=(--author "${author}")
 
@@ -321,13 +325,7 @@ mode_close_duplicates() {
 
     echo "Fetching open PRs (author: ${author}, filter: ${filter})..." >&2
     local pr_data
-    pr_data=$(gh pr list --repo "${GH_REPO}" --state open --limit 100 \
-        --json "number,title,url,baseRefName" \
-        --author "${author}")
-
-    # Filter to PRs whose title contains the filter string
-    pr_data=$(echo "${pr_data}" | jq -c --arg f "${filter}" \
-        '[.[] | select(.title | contains($f))]')
+    pr_data=$(fetch_open_prs "${filter}" "${author}" "baseRefName")
 
     [[ "$(echo "${pr_data}" | jq 'length')" -eq 0 ]] && { echo "No matching PRs found."; return; }
 
@@ -369,11 +367,12 @@ mode_close_duplicates() {
             comment+=$'\n'"/close"
             comment+="${SIGNATURE}"
 
-            echo "  Closing PR #${dup_number} (${dup_title})..."
+            echo "Closing PR #${dup_number} (${dup_title})..."
             if ${execute}; then
                 gh pr comment "${dup_number}" --repo "${GH_REPO}" --body "${comment}"
+                echo "PR #${dup_number}: Close comment posted"
             else
-                echo "  gh pr comment ${dup_number} --repo ${GH_REPO} --body '${comment}'"
+                echo "gh pr comment ${dup_number} --repo ${GH_REPO} --body '${comment}'"
             fi
         done
     done
