@@ -310,8 +310,8 @@ mode_restart() {
 }
 
 # Close-duplicates mode: close older PRs superseded by newer ones.
-# Groups PRs by target branch + title prefix. Within each group,
-# keeps the newest PR (highest number) and closes older ones.
+# Groups PRs by target branch. Within each group, keeps the newest
+# PR (highest number) and closes older ones.
 mode_close_duplicates() {
     local filter="${1:-}" author="${2:-}" execute="${3:-false}"
 
