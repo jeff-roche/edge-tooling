@@ -247,6 +247,7 @@ def _build_issues_from_jobs(jobs):
             job["stack_layer"],
             job.get("step_name", ""),
             job.get("error_signature", ""),
+            job.get("infrastructure_failure", False),
         )] += 1
 
     issues = []
@@ -256,6 +257,7 @@ def _build_issues_from_jobs(jobs):
             rep["stack_layer"],
             rep.get("step_name", ""),
             rep.get("error_signature", ""),
+            any(j.get("infrastructure_failure") for j in group),
         )
         issues.append({
             "number": i,
