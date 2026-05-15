@@ -28,35 +28,32 @@ fetch_latest_per_job() {
 }
 
 usage() {
-    echo "Usage: ${0} [--mode MODE] --component <component> <release>" >&2
+    echo "Usage: ${0} [--mode MODE] <component> <release>" >&2
     echo "  --mode MODE: Operation mode (default: failed)" >&2
     echo "    status: Latest run status for each job" >&2
     echo "    failed: Only jobs with failure status" >&2
-    echo "  --component C: Component name used to filter jobs (e.g., microshift, lvm-operator)" >&2
+    echo "  component: Component name used to filter jobs (e.g., microshift, lvm-operator)" >&2
     echo "  release: OpenShift release version (e.g., 4.22, main)" >&2
     exit 1
 }
 
 main() {
     local mode="failed"
-    local release=""
-    local component=""
+    local positional=()
 
     while [[ ${#} -gt 0 ]]; do
         case "${1}" in
             --mode)
                 [[ ${#} -lt 2 ]] && { echo "Error: mode requires an argument" >&2; usage; }
                 mode="${2}"; shift 2 ;;
-            --component)
-                [[ ${#} -lt 2 ]] && { echo "Error: component requires an argument" >&2; usage; }
-                component="${2}"; shift 2 ;;
             -*) echo "Unknown option: ${1}" >&2; usage ;;
-            *) release="${1}"; shift ;;
+            *) positional+=("${1}"); shift ;;
         esac
     done
 
-    [[ -z "${release}" ]] && { echo "Error: release argument is required" >&2; usage; }
-    [[ -z "${component}" ]] && { echo "Error: --component is required" >&2; usage; }
+    [[ ${#positional[@]} -lt 2 ]] && { echo "Error: component and release arguments are required" >&2; usage; }
+    local component="${positional[0]}"
+    local release="${positional[1]}"
 
     case "${mode}" in
         status) fetch_latest_per_job "${release}" "${component}" ;;

@@ -12,7 +12,7 @@ set -euo pipefail
 #     - Downloads all artifacts in parallel
 #     - Writes per-release and PR jobs JSON files
 #
-#   doctor.sh graphs --workdir DIR [--timezone TZ]
+#   doctor.sh graphs --component <component> --workdir DIR [--timezone TZ]
 #     - Generates PCP performance graphs for all jobs with pmlogs
 #     - Outputs PNG files to ${WORKDIR}/graphs/<build_id>/
 #
@@ -68,7 +68,7 @@ cmd_prepare() {
         echo "  Collecting failed periodic jobs..." >&2
         local raw_json raw_err
         raw_err=$(mktemp)
-        if ! raw_json=$(bash "${SCRIPT_DIR}/prow-jobs-for-release.sh" --component "${COMPONENT}" "${release}" 2>"${raw_err}"); then
+        if ! raw_json=$(bash "${SCRIPT_DIR}/prow-jobs-for-release.sh" "${COMPONENT}" "${release}" 2>"${raw_err}"); then
             echo "  ERROR: failed to collect jobs for release ${release}:" >&2
             local err_msg
             err_msg=$(cat "${raw_err}")

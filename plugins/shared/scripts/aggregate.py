@@ -2,7 +2,7 @@
 """
 Aggregate per-job analysis reports into a release or PR summary JSON file.
 
-Shared across products (MicroShift, LVMS, etc.) via symlinks in each
+Shared across components (MicroShift, LVMS, etc.) via symlinks in each
 plugin's scripts/ directory.
 
 Usage:
@@ -119,7 +119,7 @@ def _normalize_step_name(step_name):
     test-variant prefix, sometimes not, which would cause identical
     steps to land in different buckets during two-pass grouping.
 
-    The regex harmlessly falls through for products that don't match
+    The regex harmlessly falls through for components that don't match
     the MicroShift pattern — the original step_name is returned as-is.
     """
     m = re.search(r"(openshift-microshift-\S+)", step_name)

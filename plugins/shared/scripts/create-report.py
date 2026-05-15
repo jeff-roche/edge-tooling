@@ -982,7 +982,7 @@ def render_pr_section(pr_data, bug_candidates, pr_status, pr_error=None):
     return "\n".join(toc_lines) + "\n\n" + "\n".join(lines)
 
 
-def generate_html(product_title, releases_data, all_bug_candidates, pr_data, pr_status, timestamp, pr_error=None, bugs_tab_data=None):
+def generate_html(component_title, releases_data, all_bug_candidates, pr_data, pr_status, timestamp, pr_error=None, bugs_tab_data=None):
     date_str = timestamp.strftime("%Y-%m-%d")
     time_str = timestamp.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -1050,7 +1050,7 @@ def generate_html(product_title, releases_data, all_bug_candidates, pr_data, pr_
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>{product_title} CI Doctor Report - {date_str}</title>
+    <title>{component_title} CI Doctor Report - {date_str}</title>
     <style>
 {CSS}
     </style>
@@ -1058,7 +1058,7 @@ def generate_html(product_title, releases_data, all_bug_candidates, pr_data, pr_
 <body>
 <div id="loading" style="display:flex;align-items:center;justify-content:center;height:80vh;font-family:sans-serif;color:#6c757d;font-size:1.2em;">Loading report&hellip;</div>
 <div class="container" style="display:none">
-    <h1>{product_title} CI Doctor Report</h1>
+    <h1>{component_title} CI Doctor Report</h1>
     <p class="timestamp">Generated: {time_str} UTC</p>
 
     <div class="overview-grid">
