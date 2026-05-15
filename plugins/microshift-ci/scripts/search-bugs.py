@@ -257,6 +257,7 @@ def build_candidates(groups):
                 rep["stack_layer"],
                 rep.get("step_name", ""),
                 rep.get("error_signature", ""),
+                any(j.get("infrastructure_failure") for j in group),
             ),
             "step_name": ", ".join(step_names),
             "affected_jobs": len(group),

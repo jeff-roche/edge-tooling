@@ -17,12 +17,18 @@ BUILD_STEP_PATTERNS = ("update-origin", "build-image", "iso-build")
 BUILD_SIGNATURE_PATTERNS = ("update-origin", "build-image")
 
 
-def classify_breakdown(stack_layer, step_name="", error_signature=""):
+def classify_breakdown(stack_layer, step_name="", error_signature="",
+                       infrastructure_failure=False):
     """Classify a CI failure as build, test, or infrastructure.
 
-    Uses deterministic step-name and error-signature pattern matching,
-    falling back to the LLM's STACK_LAYER when no pattern matches.
+    The INFRASTRUCTURE_FAILURE flag from the LLM analysis overrides
+    pattern-based classification when set.  Otherwise uses deterministic
+    step-name and error-signature pattern matching, falling back to the
+    LLM's STACK_LAYER when no pattern matches.
     """
+    if infrastructure_failure:
+        return "infrastructure"
+
     lower_step = step_name.lower()
     lower_sig = error_signature.lower()
 
