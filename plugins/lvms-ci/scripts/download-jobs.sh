@@ -1,0 +1,1 @@
+../../shared/scripts/download-jobs.sh
