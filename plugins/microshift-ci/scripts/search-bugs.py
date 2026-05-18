@@ -977,7 +977,8 @@ def main():
         sys.exit(1)
 
     if workdir is None:
-        workdir = f"/tmp/microshift-ci-claude-workdir.{datetime.now().strftime('%y%m%d')}"
+        print("Error: --workdir DIR is required", file=sys.stderr)
+        sys.exit(1)
 
     if not os.path.isdir(workdir):
         print(f"Error: work directory does not exist: {workdir}", file=sys.stderr)
@@ -1036,7 +1037,7 @@ def main_merge(merge_files, workdir):
     """Entry point for --merge mode."""
     if not merge_files:
         print(
-            "Usage: search-bugs.py --merge <candidates1.json> <candidates2.json> ... [--workdir DIR]",
+            "Usage: search-bugs.py --merge <candidates1.json> <candidates2.json> ... --workdir DIR",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -1047,7 +1048,8 @@ def main_merge(merge_files, workdir):
             sys.exit(1)
 
     if workdir is None:
-        workdir = f"/tmp/microshift-ci-claude-workdir.{datetime.now().strftime('%y%m%d')}"
+        print("Error: --workdir DIR is required", file=sys.stderr)
+        sys.exit(1)
 
     os.makedirs(workdir, exist_ok=True)
 
