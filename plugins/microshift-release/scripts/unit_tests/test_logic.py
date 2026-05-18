@@ -146,6 +146,42 @@ class TestInterpretCves(unittest.TestCase):
         result = interpret_cves(report)
         self.assertEqual(result["impact"], "needs_review")
 
+    def test_cve_must_release_resolution_done(self):
+        report = {
+            "RHSA-2026:12345": {
+                "type": "image",
+                "cves": {
+                    "CVE-2026-9999": {
+                        "jira_ticket": {
+                            "id": "OCPBUGS-80721",
+                            "resolution": "Done",
+                            "status": "Closed",
+                        }
+                    }
+                },
+            }
+        }
+        result = interpret_cves(report)
+        self.assertEqual(result["impact"], "must_release")
+
+    def test_cve_needs_review_status_verified(self):
+        report = {
+            "RHSA-2026:12345": {
+                "type": "extras",
+                "cves": {
+                    "CVE-2026-8888": {
+                        "jira_ticket": {
+                            "id": "OCPBUGS-12345",
+                            "resolution": "",
+                            "status": "Verified",
+                        }
+                    }
+                },
+            }
+        }
+        result = interpret_cves(report)
+        self.assertEqual(result["impact"], "needs_review")
+
     def test_metadata_skipped(self):
         report = {
             "RHBA-2026:99999": {
