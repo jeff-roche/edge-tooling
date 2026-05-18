@@ -234,37 +234,13 @@ This writes `<WORKDIR>/analyze-ci-bug-candidates-merged.json`. Read and use this
 
 **Actions**:
 
-1. Display a numbered list of all bug candidates with:
-   - Summary (derived from error signature)
-   - Severity and affected job count
-   - Step name(s) where failure occurred
-   - Releases: list of releases with job counts per release
-   - List of affected job URLs
-   - Potential duplicate JIRAs found (if any), with key, summary, and status
-   - Mode indicator: `[WOULD CREATE]` / `[WOULD SKIP]` or `[WILL CREATE]`
+1. **In dry-run mode** (`--create` NOT specified):
+   - Apply the Auto-Decision Policy (see below) to each candidate
+   - Do NOT display individual candidates to the user — the report in Step 5 handles that
+   - Do NOT prompt for any actions. Do NOT create any issues. Do NOT proceed to Steps 4/4a
+   - Build the results array (see Results JSON below), write it, and continue to Step 5
 
-2. **In dry-run mode** (`--create` NOT specified, `--auto` NOT specified):
-   - Apply the Auto-Decision Policy (see below) to label each candidate `[WOULD CREATE]` or `[WOULD SKIP]` — do NOT prompt the user
-   - Include `Decision:` line per candidate (same format as Step 5 report)
-   - After listing all candidates, show a summary:
-
-     ```text
-     SUMMARY
-       Sources processed: N
-       Unique failures: N (from M total candidates)
-       Would create: N
-       Would skip (Jira duplicate): N
-       Would skip (infrastructure): N
-       Would skip (stale regression): N
-
-     To create these bugs, run:
-       /microshift-ci:create-bugs <sources> --create
-       /microshift-ci:create-bugs <sources> --auto --create
-     ```
-
-   - Do NOT prompt for any actions. Do NOT create any issues. Do NOT proceed to Steps 4/4a (create/reopen). Continue to Step 5 (report).
-
-3. **In create mode** (`--create` specified, `--auto` NOT specified):
+2. **In interactive create mode** (`--create` specified, `--auto` NOT specified):
    - For each candidate, prompt the user:
 
      ```text
@@ -302,11 +278,11 @@ This writes `<WORKDIR>/analyze-ci-bug-candidates-merged.json`. Read and use this
    - **link-to-existing**: Validate the key by calling `mcp__jira__jira_get_issue(issue_key=<JIRA-KEY>)`. If the issue exists, record the key and move to next. If the call fails or returns not-found, show an error (e.g., `"JIRA key <JIRA-KEY> not found — check for typos"`) and re-prompt with the same `Action?` choices.
    - **reopen**: Validate the provided JIRA key before proceeding. Call `mcp__jira__jira_get_issue(issue_key=<JIRA-KEY>)` to confirm the issue exists, then verify that the key matches one of the candidate's closed regressions found in Search C, that the issue status is Closed or Verified, and that the issue type is Bug. If validation fails (key not found, not in the candidate's closed regression list, not in Closed/Verified state, or not a Bug), show an error (e.g., `"JIRA key <JIRA-KEY> not eligible for reopen — must be a Bug closed regression"`) and re-prompt with the same `Action?` choices. If validation passes, proceed to Step 4a.
 
-4. **In auto dry-run mode** (`--auto` without `--create`):
-   - Same as dry-run mode (Step 3.2) — auto-decision policy is always applied
+3. **In auto dry-run mode** (`--auto` without `--create`):
+   - Same as dry-run mode (item 1 above)
    - Continue to Step 5
 
-5. **In auto create mode** (`--auto --create`):
+4. **In auto create mode** (`--auto --create`):
    - Apply the auto-decision policy and execute actions — do NOT prompt the user
    - For candidates where decision is "create": proceed to Step 4
    - For candidates where decision is "skip": record the skip reason and move to next
