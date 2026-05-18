@@ -324,6 +324,43 @@ When `--auto` is active, apply these rules in order for each candidate:
 | Has closed regressions but no open duplicates — and **any** job `finished` date is **after** the regression's `updated` date | **Create** | Add `"Potential regression of <JIRA-KEY>"` to the bug description's Additional Info section |
 | No duplicates, no regressions | **Create** | `"No existing duplicates"` |
 
+#### Results JSON
+
+As you process each candidate (applying auto-decision policy or prompting user), build a results array. After all candidates are processed (and Step 4/4a completes for create mode), write the results to `<WORKDIR>/analyze-ci-bug-results.json`:
+
+```json
+{
+  "mode": "dry-run",
+  "date": "YYYY-MM-DD",
+  "results": [
+    {
+      "error_signature": "<matches candidate's error_signature exactly>",
+      "action": "create",
+      "jira_key": "USHIFT-1234",
+      "skip_category": "",
+      "reason": "No existing duplicates"
+    },
+    {
+      "error_signature": "<matches candidate's error_signature exactly>",
+      "action": "skip",
+      "jira_key": "",
+      "skip_category": "duplicate",
+      "reason": "Duplicate of USHIFT-6938"
+    }
+  ]
+}
+```
+
+All fields are required on every entry:
+
+- `error_signature`: must match the candidate's `error_signature` exactly
+- `action`: one of `create`, `skip`, `link`, `reopen`, `failed`
+- `jira_key`: the JIRA key for `create`/`link`/`reopen`; empty string `""` for `skip`/`failed`
+- `skip_category`: one of `duplicate`, `infrastructure`, `stale_regression` for `skip`; empty string `""` for other actions
+- `reason`: human-readable explanation, always non-empty
+
+Set `mode` to `"dry-run"` or `"create"` matching the current run mode. Set `date` to today's date (YYYY-MM-DD).
+
 ### Step 4: Create Bug via MCP (create mode only)
 
 **Actions**:
@@ -470,120 +507,21 @@ For each candidate where user chose "reopen":
 - If the transition fails, report error and ask user if they want to retry, create a new bug instead, or skip
 - Do NOT retry automatically
 
-### Step 5: Generate Results Report
-
-The report file must use the exact format below. Both the on-screen display (Step 3) and the saved report file follow the same template.
+### Step 5: Generate Results Report (Deterministic Script)
 
 **Actions**:
 
-1. Save report to `<WORKDIR>/analyze-ci-create-bugs-<source>.txt` for a single source, or `<WORKDIR>/analyze-ci-create-bugs-merged.txt` for multiple sources (overwrite if exists)
-2. Display summary to user:
+1. Ensure `<WORKDIR>/analyze-ci-bug-results.json` was written in Step 3
+2. Generate the report:
 
-**Dry-run report format**:
+   ```text
+   python3 plugins/microshift-ci/scripts/search-bugs.py \
+     --report <WORKDIR>/analyze-ci-bug-results.json \
+     --candidates <WORKDIR>/analyze-ci-bug-candidates-merged.json \
+     --workdir <WORKDIR>
+   ```
 
-```text
-═══════════════════════════════════════════════════════════════
-ANALYZE-CI CREATE BUGS - DRY-RUN REPORT
-Sources: <source1>, <source2>, ...
-Date: YYYY-MM-DD
-═══════════════════════════════════════════════════════════════
-
-CANDIDATES (<N> unique failures from <M> total across <S> sources)
-
-  1. [WOULD CREATE]
-     MicroShift CI: <error_signature>
-     Severity: X | Total Jobs: Y | Step: <step_name>
-     Releases: <source1> (N jobs), <source2> (N jobs)
-     Grouped with:                          ← only when merged_signatures is non-empty
-       - <other_error_signature_1>
-       - <other_error_signature_2>
-     Potential Duplicates: None
-     Potential Regressions: None
-     Decision: No existing duplicates
-
-  2. [WOULD SKIP]
-     MicroShift CI: <error_signature>
-     Severity: X | Total Jobs: Y | Step: <step_name>
-     Releases: <source1> (N jobs)
-     Potential Duplicates: USHIFT-XXXXX [Status]
-     Decision: Duplicate of USHIFT-XXXXX
-
-  3. [WOULD CREATE]
-     MicroShift CI: <error_signature>
-     Severity: X | Total Jobs: Y | Step: <step_name>
-     Releases: <source1> (N jobs), <source2> (N jobs), <source3> (N jobs)
-     Grouped with:                          ← only when merged_signatures is non-empty
-       - <other_error_signature_1>
-     Potential Regressions: USHIFT-YYYYY [Closed]
-     Decision: Potential regression of USHIFT-YYYYY [Closed]
-
-  4. [WOULD SKIP]
-     MicroShift CI: <error_signature>
-     Severity: X | Total Jobs: Y | Step: <step_name>
-     Releases: <source1> (N jobs)
-     Potential Regressions: USHIFT-ZZZZZ [Closed]
-     Decision: Stale failure predating fix for USHIFT-ZZZZZ (updated YYYY-MM-DD)
-
-...
-
-SUMMARY
-  Sources processed: N
-  Unique failures: N (from M total candidates)
-  Would create: N
-  Would skip (Jira duplicate): N
-  Would skip (stale regression): N
-
-To create these bugs, run:
-  /microshift-ci:create-bugs <source1>,<source2>,... --create
-  /microshift-ci:create-bugs <source1>,<source2>,... --auto --create
-
-Report saved: <WORKDIR>/analyze-ci-create-bugs-<source|merged>.txt
-═══════════════════════════════════════════════════════════════
-```
-
-**Create mode report format**:
-
-```text
-═══════════════════════════════════════════════════════════════
-ANALYZE-CI CREATE BUGS - CREATION REPORT
-Sources: <source1>, <source2>, ...
-Date: YYYY-MM-DD
-═══════════════════════════════════════════════════════════════
-
-RESULTS (<N> unique failures from <M> total across <S> sources)
-
-  1. USHIFT-12345 (CREATED)
-     MicroShift CI: <error_signature>
-     Releases: <source1> (N jobs), <source2> (N jobs)
-     Grouped with:                          ← only when merged_signatures is non-empty
-       - <other_error_signature_1>
-     URL: https://redhat.atlassian.net/browse/USHIFT-12345
-
-  2. SKIPPED
-     MicroShift CI: <error_signature>
-     Releases: <source1> (N jobs)
-     Reason: Duplicate of USHIFT-99999
-
-  3. USHIFT-12346 (CREATED)
-     MicroShift CI: <error_signature>
-     Releases: <source1> (N jobs), <source3> (N jobs)
-     URL: https://redhat.atlassian.net/browse/USHIFT-12346
-     Reason: Potential regression of USHIFT-88888 [Closed]
-
-...
-
-SUMMARY
-  Sources processed: N
-  Unique failures: N (from M total candidates)
-  Created: N
-  Skipped: N
-  Linked to existing: N
-  Reopened: N
-  Failed: N
-
-Report saved: <WORKDIR>/analyze-ci-create-bugs-<source|merged>.txt
-═══════════════════════════════════════════════════════════════
-```
+3. Display the report output to the user
 
 ## Examples
 
