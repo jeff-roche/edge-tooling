@@ -601,10 +601,11 @@ def _validate_results(results_data, candidates_data):
     """Validate results JSON against merged candidates. Exit non-zero on any mismatch."""
     errors = []
 
-    if "mode" not in results_data:
+    mode = results_data.get("mode", "")
+    if not mode:
         errors.append("results JSON missing 'mode' field")
-    elif results_data["mode"] not in ("dry-run", "create"):
-        errors.append(f"invalid mode: {results_data['mode']}")
+    elif mode not in ("dry-run", "create"):
+        errors.append(f"invalid mode: {mode}")
 
     if "date" not in results_data:
         errors.append("results JSON missing 'date' field")
@@ -625,6 +626,8 @@ def _validate_results(results_data, candidates_data):
         if not sig:
             errors.append(f"{prefix}: missing error_signature")
         else:
+            if sig in result_sigs:
+                errors.append(f"{prefix}: duplicate error_signature '{sig}'")
             result_sigs.add(sig)
 
         action = r.get("action", "")
@@ -633,11 +636,15 @@ def _validate_results(results_data, candidates_data):
 
         if "jira_key" not in r:
             errors.append(f"{prefix}: missing jira_key field")
+        elif mode == "create" and action in ("create", "link", "reopen") and not r["jira_key"]:
+            errors.append(f"{prefix}: {action} action requires non-empty jira_key")
 
         if "skip_category" not in r:
             errors.append(f"{prefix}: missing skip_category field")
         elif action == "skip" and r["skip_category"] not in VALID_SKIP_CATEGORIES:
             errors.append(f"{prefix}: invalid skip_category '{r['skip_category']}' for skip action")
+        elif action != "skip" and r["skip_category"]:
+            errors.append(f"{prefix}: skip_category must be empty for action '{action}'")
 
         reason = r.get("reason", "")
         if not reason:
@@ -692,6 +699,8 @@ def _format_grouped_with(merged_signatures):
 
 def _format_jobs(jobs):
     """Format job URLs list."""
+    if not jobs:
+        return ""
     lines = ["     Jobs:"]
     for job in jobs:
         lines.append(f"       - {job['job_url']}")
@@ -746,10 +755,8 @@ def format_dry_run_report(candidates_data, results_data):
         r = result_lookup[cand["error_signature"]]
         action = r["action"]
 
-        if action == "skip":
-            tag = "WOULD SKIP"
-        else:
-            tag = "WOULD CREATE"
+        tag_map = {"skip": "WOULD SKIP", "create": "WOULD CREATE"}
+        tag = tag_map.get(action, f"WOULD {action.upper()}")
 
         lines.append("")
         lines.append(f"  {i}. [{tag}]")
@@ -765,7 +772,8 @@ def format_dry_run_report(candidates_data, results_data):
         lines.append(f"     {_format_jira_refs('Potential Regressions', cand.get('regressions', []))}")
 
         jobs_block = _format_jobs(cand.get("jobs", []))
-        lines.append(jobs_block)
+        if jobs_block:
+            lines.append(jobs_block)
 
         lines.append(f"     Decision: {r['reason']}")
 
