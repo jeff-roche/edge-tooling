@@ -282,7 +282,7 @@ This writes `<WORKDIR>/analyze-ci-bug-candidates-merged.json`. Read and use this
    - Same as dry-run mode (item 1 above)
    - Continue to Step 5
 
-4. **In auto create mode** (`--auto --create`):
+4. **In auto-create mode** (`--auto --create`):
    - Apply the auto-decision policy and execute actions — do NOT prompt the user
    - For candidates where decision is "create": proceed to Step 4
    - For candidates where decision is "skip": record the skip reason and move to next
