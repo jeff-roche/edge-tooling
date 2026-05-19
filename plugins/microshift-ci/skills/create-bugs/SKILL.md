@@ -234,37 +234,13 @@ This writes `<WORKDIR>/analyze-ci-bug-candidates-merged.json`. Read and use this
 
 **Actions**:
 
-1. Display a numbered list of all bug candidates with:
-   - Summary (derived from error signature)
-   - Severity and affected job count
-   - Step name(s) where failure occurred
-   - Releases: list of releases with job counts per release
-   - List of affected job URLs
-   - Potential duplicate JIRAs found (if any), with key, summary, and status
-   - Mode indicator: `[WOULD CREATE]` / `[WOULD SKIP]` or `[WILL CREATE]`
+1. **In dry-run mode** (`--create` NOT specified):
+   - Apply the Auto-Decision Policy (see below) to each candidate
+   - Do NOT display individual candidates to the user — the report in Step 5 handles that
+   - Do NOT prompt for any actions. Do NOT create any issues. Do NOT proceed to Steps 4/4a
+   - Build the results array (see Results JSON below), write it, and continue to Step 5
 
-2. **In dry-run mode** (`--create` NOT specified, `--auto` NOT specified):
-   - Apply the Auto-Decision Policy (see below) to label each candidate `[WOULD CREATE]` or `[WOULD SKIP]` — do NOT prompt the user
-   - Include `Decision:` line per candidate (same format as Step 5 report)
-   - After listing all candidates, show a summary:
-
-     ```text
-     SUMMARY
-       Sources processed: N
-       Unique failures: N (from M total candidates)
-       Would create: N
-       Would skip (Jira duplicate): N
-       Would skip (infrastructure): N
-       Would skip (stale regression): N
-
-     To create these bugs, run:
-       /microshift-ci:create-bugs <sources> --create
-       /microshift-ci:create-bugs <sources> --auto --create
-     ```
-
-   - Do NOT prompt for any actions. Do NOT create any issues. Do NOT proceed to Steps 4/4a (create/reopen). Continue to Step 5 (report).
-
-3. **In create mode** (`--create` specified, `--auto` NOT specified):
+2. **In interactive create mode** (`--create` specified, `--auto` NOT specified):
    - For each candidate, prompt the user:
 
      ```text
@@ -302,11 +278,11 @@ This writes `<WORKDIR>/analyze-ci-bug-candidates-merged.json`. Read and use this
    - **link-to-existing**: Validate the key by calling `mcp__jira__jira_get_issue(issue_key=<JIRA-KEY>)`. If the issue exists, record the key and move to next. If the call fails or returns not-found, show an error (e.g., `"JIRA key <JIRA-KEY> not found — check for typos"`) and re-prompt with the same `Action?` choices.
    - **reopen**: Validate the provided JIRA key before proceeding. Call `mcp__jira__jira_get_issue(issue_key=<JIRA-KEY>)` to confirm the issue exists, then verify that the key matches one of the candidate's closed regressions found in Search C, that the issue status is Closed or Verified, and that the issue type is Bug. If validation fails (key not found, not in the candidate's closed regression list, not in Closed/Verified state, or not a Bug), show an error (e.g., `"JIRA key <JIRA-KEY> not eligible for reopen — must be a Bug closed regression"`) and re-prompt with the same `Action?` choices. If validation passes, proceed to Step 4a.
 
-4. **In auto dry-run mode** (`--auto` without `--create`):
-   - Same as dry-run mode (Step 3.2) — auto-decision policy is always applied
+3. **In auto dry-run mode** (`--auto` without `--create`):
+   - Same as dry-run mode (item 1 above)
    - Continue to Step 5
 
-5. **In auto create mode** (`--auto --create`):
+4. **In auto-create mode** (`--auto --create`):
    - Apply the auto-decision policy and execute actions — do NOT prompt the user
    - For candidates where decision is "create": proceed to Step 4
    - For candidates where decision is "skip": record the skip reason and move to next
@@ -323,6 +299,43 @@ When `--auto` is active, apply these rules in order for each candidate:
 | Has closed regressions but no open duplicates — and **all** job `finished` dates are **on or before** the regression's `updated` date | **Skip** | `"Stale failure predating fix for <JIRA-KEY> (updated <YYYY-MM-DD>)"` |
 | Has closed regressions but no open duplicates — and **any** job `finished` date is **after** the regression's `updated` date | **Create** | Add `"Potential regression of <JIRA-KEY>"` to the bug description's Additional Info section |
 | No duplicates, no regressions | **Create** | `"No existing duplicates"` |
+
+#### Results JSON
+
+As you process each candidate (applying auto-decision policy or prompting user), build a results array. After all candidates are processed (and Step 4/4a completes for create mode), write the results to `<WORKDIR>/analyze-ci-bug-results.json`:
+
+```json
+{
+  "mode": "dry-run",
+  "date": "YYYY-MM-DD",
+  "results": [
+    {
+      "error_signature": "<matches candidate's error_signature exactly>",
+      "action": "create",
+      "jira_key": "USHIFT-1234",
+      "skip_category": "",
+      "reason": "No existing duplicates"
+    },
+    {
+      "error_signature": "<matches candidate's error_signature exactly>",
+      "action": "skip",
+      "jira_key": "",
+      "skip_category": "duplicate",
+      "reason": "Duplicate of USHIFT-6938"
+    }
+  ]
+}
+```
+
+All fields are required on every entry:
+
+- `error_signature`: must match the candidate's `error_signature` exactly
+- `action`: one of `create`, `skip`, `link`, `reopen`, `failed`
+- `jira_key`: the JIRA key for `create`/`link`/`reopen`; empty string `""` for `skip`/`failed`
+- `skip_category`: one of `duplicate`, `infrastructure`, `stale_regression` for `skip`; empty string `""` for other actions
+- `reason`: human-readable explanation, always non-empty
+
+Set `mode` to `"dry-run"` or `"create"` matching the current run mode. Set `date` to today's date (YYYY-MM-DD).
 
 ### Step 4: Create Bug via MCP (create mode only)
 
@@ -470,120 +483,21 @@ For each candidate where user chose "reopen":
 - If the transition fails, report error and ask user if they want to retry, create a new bug instead, or skip
 - Do NOT retry automatically
 
-### Step 5: Generate Results Report
-
-The report file must use the exact format below. Both the on-screen display (Step 3) and the saved report file follow the same template.
+### Step 5: Generate Results Report (Deterministic Script)
 
 **Actions**:
 
-1. Save report to `<WORKDIR>/analyze-ci-create-bugs-<source>.txt` for a single source, or `<WORKDIR>/analyze-ci-create-bugs-merged.txt` for multiple sources (overwrite if exists)
-2. Display summary to user:
+1. Ensure `<WORKDIR>/analyze-ci-bug-results.json` was written in Step 3
+2. Generate the report:
 
-**Dry-run report format**:
+   ```text
+   python3 plugins/microshift-ci/scripts/search-bugs.py \
+     --report <WORKDIR>/analyze-ci-bug-results.json \
+     --candidates <WORKDIR>/analyze-ci-bug-candidates-merged.json \
+     --workdir <WORKDIR>
+   ```
 
-```text
-═══════════════════════════════════════════════════════════════
-ANALYZE-CI CREATE BUGS - DRY-RUN REPORT
-Sources: <source1>, <source2>, ...
-Date: YYYY-MM-DD
-═══════════════════════════════════════════════════════════════
-
-CANDIDATES (<N> unique failures from <M> total across <S> sources)
-
-  1. [WOULD CREATE]
-     MicroShift CI: <error_signature>
-     Severity: X | Total Jobs: Y | Step: <step_name>
-     Releases: <source1> (N jobs), <source2> (N jobs)
-     Grouped with:                          ← only when merged_signatures is non-empty
-       - <other_error_signature_1>
-       - <other_error_signature_2>
-     Potential Duplicates: None
-     Potential Regressions: None
-     Decision: No existing duplicates
-
-  2. [WOULD SKIP]
-     MicroShift CI: <error_signature>
-     Severity: X | Total Jobs: Y | Step: <step_name>
-     Releases: <source1> (N jobs)
-     Potential Duplicates: USHIFT-XXXXX [Status]
-     Decision: Duplicate of USHIFT-XXXXX
-
-  3. [WOULD CREATE]
-     MicroShift CI: <error_signature>
-     Severity: X | Total Jobs: Y | Step: <step_name>
-     Releases: <source1> (N jobs), <source2> (N jobs), <source3> (N jobs)
-     Grouped with:                          ← only when merged_signatures is non-empty
-       - <other_error_signature_1>
-     Potential Regressions: USHIFT-YYYYY [Closed]
-     Decision: Potential regression of USHIFT-YYYYY [Closed]
-
-  4. [WOULD SKIP]
-     MicroShift CI: <error_signature>
-     Severity: X | Total Jobs: Y | Step: <step_name>
-     Releases: <source1> (N jobs)
-     Potential Regressions: USHIFT-ZZZZZ [Closed]
-     Decision: Stale failure predating fix for USHIFT-ZZZZZ (updated YYYY-MM-DD)
-
-...
-
-SUMMARY
-  Sources processed: N
-  Unique failures: N (from M total candidates)
-  Would create: N
-  Would skip (Jira duplicate): N
-  Would skip (stale regression): N
-
-To create these bugs, run:
-  /microshift-ci:create-bugs <source1>,<source2>,... --create
-  /microshift-ci:create-bugs <source1>,<source2>,... --auto --create
-
-Report saved: <WORKDIR>/analyze-ci-create-bugs-<source|merged>.txt
-═══════════════════════════════════════════════════════════════
-```
-
-**Create mode report format**:
-
-```text
-═══════════════════════════════════════════════════════════════
-ANALYZE-CI CREATE BUGS - CREATION REPORT
-Sources: <source1>, <source2>, ...
-Date: YYYY-MM-DD
-═══════════════════════════════════════════════════════════════
-
-RESULTS (<N> unique failures from <M> total across <S> sources)
-
-  1. USHIFT-12345 (CREATED)
-     MicroShift CI: <error_signature>
-     Releases: <source1> (N jobs), <source2> (N jobs)
-     Grouped with:                          ← only when merged_signatures is non-empty
-       - <other_error_signature_1>
-     URL: https://redhat.atlassian.net/browse/USHIFT-12345
-
-  2. SKIPPED
-     MicroShift CI: <error_signature>
-     Releases: <source1> (N jobs)
-     Reason: Duplicate of USHIFT-99999
-
-  3. USHIFT-12346 (CREATED)
-     MicroShift CI: <error_signature>
-     Releases: <source1> (N jobs), <source3> (N jobs)
-     URL: https://redhat.atlassian.net/browse/USHIFT-12346
-     Reason: Potential regression of USHIFT-88888 [Closed]
-
-...
-
-SUMMARY
-  Sources processed: N
-  Unique failures: N (from M total candidates)
-  Created: N
-  Skipped: N
-  Linked to existing: N
-  Reopened: N
-  Failed: N
-
-Report saved: <WORKDIR>/analyze-ci-create-bugs-<source|merged>.txt
-═══════════════════════════════════════════════════════════════
-```
+3. Display the report output to the user
 
 ## Examples
 

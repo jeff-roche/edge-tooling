@@ -7,8 +7,9 @@ extracts Jira search keywords, and writes a candidates JSON file for
 the create-bugs skill to search Jira against.
 
 Usage:
-    search-bugs.py <source> [--workdir DIR]
-    search-bugs.py --merge <bugs-file1.json> <bugs-file2.json> ... [--workdir DIR]
+    search-bugs.py <source> --workdir DIR
+    search-bugs.py --merge <bugs-file1.json> <bugs-file2.json> ... --workdir DIR
+    search-bugs.py --report <results.json> --candidates <merged.json> --workdir DIR
 
     <source> is one of:
       - Release version: 4.22, main
@@ -19,9 +20,14 @@ Usage:
     files and merges candidates across sources using fuzzy signature
     matching for cross-release dedup.
 
+    --report mode reads a results JSON and merged candidates JSON,
+    validates 1:1 match by error_signature, and writes a deterministic
+    text report.
+
 Output:
     ${WORKDIR}/analyze-ci-bug-candidates-<source>.json       (default mode)
     ${WORKDIR}/analyze-ci-bug-candidates-merged.json          (--merge mode)
+    ${WORKDIR}/analyze-ci-create-bugs-{<source>|merged}.txt  (--report mode)
 """
 
 import json
@@ -582,6 +588,327 @@ def merge_candidate_files(filepaths, workdir=None):
 
 
 # ---------------------------------------------------------------------------
+# Report generation
+# ---------------------------------------------------------------------------
+
+VALID_ACTIONS = {"create", "skip", "link", "reopen", "failed"}
+VALID_SKIP_CATEGORIES = {"duplicate", "infrastructure", "stale_regression"}
+JIRA_URL_BASE = "https://redhat.atlassian.net/browse"
+SEPARATOR = "=" * 63
+
+
+def _validate_results(results_data, candidates_data):
+    """Validate results JSON against merged candidates. Exit non-zero on any mismatch."""
+    errors = []
+
+    mode = results_data.get("mode", "")
+    if not mode:
+        errors.append("results JSON missing 'mode' field")
+    elif mode not in ("dry-run", "create"):
+        errors.append(f"invalid mode: {mode}")
+
+    if "date" not in results_data:
+        errors.append("results JSON missing 'date' field")
+
+    if "results" not in results_data:
+        errors.append("results JSON missing 'results' field")
+        _die_on_errors(errors)
+
+    results = results_data["results"]
+    candidates = candidates_data["candidates"]
+
+    cand_sigs = {c["error_signature"] for c in candidates}
+    result_sigs = set()
+
+    for i, r in enumerate(results):
+        prefix = f"results[{i}]"
+        sig = r.get("error_signature", "")
+        if not sig:
+            errors.append(f"{prefix}: missing error_signature")
+        else:
+            if sig in result_sigs:
+                errors.append(f"{prefix}: duplicate error_signature '{sig}'")
+            result_sigs.add(sig)
+
+        action = r.get("action", "")
+        if action not in VALID_ACTIONS:
+            errors.append(f"{prefix}: invalid action '{action}'")
+
+        if "jira_key" not in r:
+            errors.append(f"{prefix}: missing jira_key field")
+        elif mode == "create" and action in ("create", "link", "reopen") and not r["jira_key"]:
+            errors.append(f"{prefix}: {action} action requires non-empty jira_key")
+
+        if "skip_category" not in r:
+            errors.append(f"{prefix}: missing skip_category field")
+        elif action == "skip" and r["skip_category"] not in VALID_SKIP_CATEGORIES:
+            errors.append(f"{prefix}: invalid skip_category '{r['skip_category']}' for skip action")
+        elif action != "skip" and r["skip_category"]:
+            errors.append(f"{prefix}: skip_category must be empty for action '{action}'")
+
+        reason = r.get("reason", "")
+        if not reason:
+            errors.append(f"{prefix}: missing or empty reason")
+
+    missing = cand_sigs - result_sigs
+    extra = result_sigs - cand_sigs
+
+    if missing:
+        errors.append(f"candidates without results: {sorted(missing)}")
+    if extra:
+        errors.append(f"results without candidates: {sorted(extra)}")
+
+    _die_on_errors(errors)
+
+
+def _die_on_errors(errors):
+    if errors:
+        for e in errors:
+            print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def _format_releases(releases):
+    """Format releases list: '4.20 (8 jobs), 4.21 (1 job)'."""
+    parts = []
+    for r in releases:
+        n = r["affected_jobs"]
+        parts.append(f"{r['source']} ({n} {'job' if n == 1 else 'jobs'})")
+    return ", ".join(parts)
+
+
+def _format_jira_refs(label, refs):
+    """Format 'Potential Duplicates: USHIFT-1234 [Status], ...' line."""
+    if not refs:
+        return f"{label}: None"
+    parts = []
+    for ref in refs:
+        parts.append(f"{ref['key']} [{ref.get('status', 'Unknown')}]")
+    return f"{label}: {', '.join(parts)}"
+
+
+def _format_grouped_with(merged_signatures):
+    """Format 'Grouped with:' block."""
+    if not merged_signatures:
+        return ""
+    lines = ["     Grouped with:"]
+    for sig in merged_signatures:
+        lines.append(f"       - {sig}")
+    return "\n".join(lines)
+
+
+def _format_jobs(jobs):
+    """Format job URLs list."""
+    if not jobs:
+        return ""
+    lines = ["     Jobs:"]
+    for job in jobs:
+        lines.append(f"       - {job['job_url']}")
+    return "\n".join(lines)
+
+
+def _compute_summary_counters(results):
+    """Compute summary counters from results list."""
+    counters = {
+        "create": 0,
+        "skip_duplicate": 0,
+        "skip_infrastructure": 0,
+        "skip_stale_regression": 0,
+        "link": 0,
+        "reopen": 0,
+        "failed": 0,
+    }
+    for r in results:
+        action = r["action"]
+        if action == "skip":
+            cat = r["skip_category"]
+            counters[f"skip_{cat}"] += 1
+        elif action in counters:
+            counters[action] += 1
+    return counters
+
+
+def format_dry_run_report(candidates_data, results_data):
+    """Produce deterministic dry-run report."""
+    candidates = candidates_data["candidates"]
+    results = results_data["results"]
+    sources = candidates_data["sources"]
+    date = results_data["date"]
+
+    result_lookup = {r["error_signature"]: r for r in results}
+    counters = _compute_summary_counters(results)
+    n_unique = len(candidates)
+    n_total = candidates_data["total_candidates"]
+    n_sources = len(sources)
+
+    lines = [
+        SEPARATOR,
+        "ANALYZE-CI CREATE BUGS - DRY-RUN REPORT",
+        f"Sources: {', '.join(sources)}",
+        f"Date: {date}",
+        SEPARATOR,
+        "",
+        f"CANDIDATES ({n_unique} unique failures from {n_total} total across {n_sources} {'source' if n_sources == 1 else 'sources'})",
+    ]
+
+    for i, cand in enumerate(candidates, 1):
+        r = result_lookup[cand["error_signature"]]
+        action = r["action"]
+
+        tag_map = {"skip": "WOULD SKIP", "create": "WOULD CREATE"}
+        tag = tag_map.get(action, f"WOULD {action.upper()}")
+
+        lines.append("")
+        lines.append(f"  {i}. [{tag}]")
+        lines.append(f"     MicroShift CI: {cand['error_signature']}")
+        lines.append(f"     Severity: {cand['severity']} | Total Jobs: {cand['affected_jobs']} | Step: {cand['step_name']}")
+        lines.append(f"     Releases: {_format_releases(cand.get('releases', []))}")
+
+        grouped = _format_grouped_with(cand.get("merged_signatures", []))
+        if grouped:
+            lines.append(grouped)
+
+        lines.append(f"     {_format_jira_refs('Potential Duplicates', cand.get('duplicates', []))}")
+        lines.append(f"     {_format_jira_refs('Potential Regressions', cand.get('regressions', []))}")
+
+        jobs_block = _format_jobs(cand.get("jobs", []))
+        if jobs_block:
+            lines.append(jobs_block)
+
+        lines.append(f"     Decision: {r['reason']}")
+
+    sources_str = ",".join(sources)
+    lines.extend([
+        "",
+        "SUMMARY",
+        f"  Sources processed: {n_sources}",
+        f"  Unique failures: {n_unique} (from {n_total} total candidates)",
+        f"  Would create: {counters['create']}",
+        f"  Would skip (Jira duplicate): {counters['skip_duplicate']}",
+        f"  Would skip (infrastructure): {counters['skip_infrastructure']}",
+        f"  Would skip (stale regression): {counters['skip_stale_regression']}",
+        "",
+        "To create these bugs, run:",
+        f"  /microshift-ci:create-bugs {sources_str} --create",
+        f"  /microshift-ci:create-bugs {sources_str} --auto --create",
+    ])
+
+    return "\n".join(lines)
+
+
+def format_create_report(candidates_data, results_data):
+    """Produce deterministic create-mode report."""
+    candidates = candidates_data["candidates"]
+    results = results_data["results"]
+    sources = candidates_data["sources"]
+    date = results_data["date"]
+
+    result_lookup = {r["error_signature"]: r for r in results}
+    counters = _compute_summary_counters(results)
+    n_unique = len(candidates)
+    n_total = candidates_data["total_candidates"]
+    n_sources = len(sources)
+
+    lines = [
+        SEPARATOR,
+        "ANALYZE-CI CREATE BUGS - CREATION REPORT",
+        f"Sources: {', '.join(sources)}",
+        f"Date: {date}",
+        SEPARATOR,
+        "",
+        f"RESULTS ({n_unique} unique failures from {n_total} total across {n_sources} {'source' if n_sources == 1 else 'sources'})",
+    ]
+
+    for i, cand in enumerate(candidates, 1):
+        r = result_lookup[cand["error_signature"]]
+        action = r["action"]
+        jira_key = r["jira_key"]
+
+        lines.append("")
+
+        if action == "create":
+            lines.append(f"  {i}. {jira_key} (CREATED)")
+            lines.append(f"     MicroShift CI: {cand['error_signature']}")
+            lines.append(f"     Releases: {_format_releases(cand.get('releases', []))}")
+            grouped = _format_grouped_with(cand.get("merged_signatures", []))
+            if grouped:
+                lines.append(grouped)
+            lines.append(f"     URL: {JIRA_URL_BASE}/{jira_key}")
+            if "regression" in r["reason"].lower():
+                lines.append(f"     Reason: {r['reason']}")
+        elif action == "skip":
+            lines.append(f"  {i}. SKIPPED")
+            lines.append(f"     MicroShift CI: {cand['error_signature']}")
+            lines.append(f"     Releases: {_format_releases(cand.get('releases', []))}")
+            lines.append(f"     Reason: {r['reason']}")
+        elif action == "link":
+            lines.append(f"  {i}. {jira_key} (LINKED)")
+            lines.append(f"     MicroShift CI: {cand['error_signature']}")
+            lines.append(f"     Releases: {_format_releases(cand.get('releases', []))}")
+            lines.append(f"     URL: {JIRA_URL_BASE}/{jira_key}")
+        elif action == "reopen":
+            lines.append(f"  {i}. {jira_key} (REOPENED)")
+            lines.append(f"     MicroShift CI: {cand['error_signature']}")
+            lines.append(f"     Releases: {_format_releases(cand.get('releases', []))}")
+            lines.append(f"     URL: {JIRA_URL_BASE}/{jira_key}")
+            lines.append(f"     Reason: {r['reason']}")
+        elif action == "failed":
+            lines.append(f"  {i}. FAILED")
+            lines.append(f"     MicroShift CI: {cand['error_signature']}")
+            lines.append(f"     Releases: {_format_releases(cand.get('releases', []))}")
+            lines.append(f"     Reason: {r['reason']}")
+
+    lines.extend([
+        "",
+        "SUMMARY",
+        f"  Sources processed: {n_sources}",
+        f"  Unique failures: {n_unique} (from {n_total} total candidates)",
+        f"  Created: {counters['create']}",
+        f"  Skipped: {counters['skip_duplicate'] + counters['skip_infrastructure'] + counters['skip_stale_regression']}",
+        f"  Linked to existing: {counters['link']}",
+        f"  Reopened: {counters['reopen']}",
+        f"  Failed: {counters['failed']}",
+    ])
+
+    return "\n".join(lines)
+
+
+def main_report(report_file, candidates_file, workdir):
+    """Entry point for --report mode."""
+    if not os.path.isdir(workdir):
+        print(f"Error: work directory does not exist: {workdir}", file=sys.stderr)
+        sys.exit(1)
+
+    with open(report_file, "r") as f:
+        results_data = json.load(f)
+    with open(candidates_file, "r") as f:
+        candidates_data = json.load(f)
+
+    _validate_results(results_data, candidates_data)
+
+    mode = results_data["mode"]
+    if mode == "dry-run":
+        report = format_dry_run_report(candidates_data, results_data)
+    else:
+        report = format_create_report(candidates_data, results_data)
+
+    sources = candidates_data["sources"]
+    if len(sources) == 1:
+        filename = f"analyze-ci-create-bugs-{sources[0]}.txt"
+    else:
+        filename = "analyze-ci-create-bugs-merged.txt"
+
+    output_path = os.path.join(workdir, filename)
+    report_with_footer = report + f"\n\nReport saved: {output_path}\n{SEPARATOR}\n"
+
+    with open(output_path, "w") as f:
+        f.write(report_with_footer)
+
+    print(f"Written: {output_path}", file=sys.stderr)
+    print(report_with_footer)
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -590,6 +917,8 @@ def main():
     source = None
     merge_mode = False
     merge_files = []
+    report_file = None
+    candidates_file = None
 
     args = sys.argv[1:]
     i = 0
@@ -597,6 +926,18 @@ def main():
         if args[i] == "--merge":
             merge_mode = True
             i += 1
+        elif args[i] == "--report":
+            if i + 1 >= len(args):
+                print("Error: --report requires an argument", file=sys.stderr)
+                sys.exit(1)
+            report_file = args[i + 1]
+            i += 2
+        elif args[i] == "--candidates":
+            if i + 1 >= len(args):
+                print("Error: --candidates requires an argument", file=sys.stderr)
+                sys.exit(1)
+            candidates_file = args[i + 1]
+            i += 2
         elif args[i] == "--workdir":
             if i + 1 >= len(args):
                 print("Error: --workdir requires an argument", file=sys.stderr)
@@ -613,20 +954,31 @@ def main():
                 source = args[i]
             i += 1
 
+    if report_file:
+        if not candidates_file:
+            print("Error: --report requires --candidates", file=sys.stderr)
+            sys.exit(1)
+        if not workdir:
+            print("Error: --report requires --workdir", file=sys.stderr)
+            sys.exit(1)
+        return main_report(report_file, candidates_file, workdir)
+
     if merge_mode:
         return main_merge(merge_files, workdir)
 
     if not source:
         print(
-            "Usage: search-bugs.py <source> [--workdir DIR]\n"
-            "       search-bugs.py --merge <bugs-file1.json> ... [--workdir DIR]\n"
+            "Usage: search-bugs.py <source> --workdir DIR\n"
+            "       search-bugs.py --merge <bugs-file1.json> ... --workdir DIR\n"
+            "       search-bugs.py --report <results.json> --candidates <merged.json> --workdir DIR\n"
             "  <source>: release version (4.22), PR (pr-6396), or rebase (rebase-release-4.22)",
             file=sys.stderr,
         )
         sys.exit(1)
 
     if workdir is None:
-        workdir = f"/tmp/microshift-ci-claude-workdir.{datetime.now().strftime('%y%m%d')}"
+        print("Error: --workdir DIR is required", file=sys.stderr)
+        sys.exit(1)
 
     if not os.path.isdir(workdir):
         print(f"Error: work directory does not exist: {workdir}", file=sys.stderr)
@@ -685,7 +1037,7 @@ def main_merge(merge_files, workdir):
     """Entry point for --merge mode."""
     if not merge_files:
         print(
-            "Usage: search-bugs.py --merge <candidates1.json> <candidates2.json> ... [--workdir DIR]",
+            "Usage: search-bugs.py --merge <candidates1.json> <candidates2.json> ... --workdir DIR",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -696,7 +1048,8 @@ def main_merge(merge_files, workdir):
             sys.exit(1)
 
     if workdir is None:
-        workdir = f"/tmp/microshift-ci-claude-workdir.{datetime.now().strftime('%y%m%d')}"
+        print("Error: --workdir DIR is required", file=sys.stderr)
+        sys.exit(1)
 
     os.makedirs(workdir, exist_ok=True)
 
