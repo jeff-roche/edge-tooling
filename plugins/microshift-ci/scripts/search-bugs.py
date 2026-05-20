@@ -8,7 +8,7 @@ the create-bugs skill to search Jira against.
 
 Usage:
     search-bugs.py <source> --workdir DIR
-    search-bugs.py --merge <bugs-file1.json> <bugs-file2.json> ... --workdir DIR
+    search-bugs.py --merge <bugs-file1.json> <bugs-file2.json> ... --output FILE --workdir DIR
     search-bugs.py --report <results.json> --candidates <merged.json> --workdir DIR
 
     <source> is one of:
