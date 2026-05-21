@@ -13,7 +13,7 @@ Add a task to today's TODO file.
    - **If `$ARGUMENTS` is provided:** use it directly. Preserve any URLs or Jira ticket keys inline.
    - **If empty:** infer from the current git branch and recent commits. Confirm with the user before adding.
 3. If the description contains a done marker (e.g., `(DONE)`, `(done)`, "mark as done"), strip it and use `- [x]` instead of `- [ ]`.
-4. Check for duplicates — if an equivalent item already exists, tell the user and stop.
+4. Check for duplicates — if an item with the same Jira key or nearly identical wording already exists, tell the user and stop.
 5. Append to the **Backlog** section (or **Completed** if marked done).
 6. Show the user what was added, then write the file.
 
