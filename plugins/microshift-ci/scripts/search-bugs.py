@@ -845,8 +845,10 @@ def main_report(report_file, candidates_file, workdir):
     release_sources = [s for s in sources if not s.startswith("rebase-")]
     if len(release_sources) > 1:
         tag = "merged"
+    elif len(release_sources) == 1:
+        tag = release_sources[0]
     else:
-        tag = release_sources[0] if release_sources else sources[0]
+        tag = "merged" if len(sources) > 1 else sources[0]
     filename = f"analyze-ci-create-bugs-{tag}.txt"
 
     output_path = os.path.join(workdir, filename)
