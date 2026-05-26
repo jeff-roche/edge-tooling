@@ -307,7 +307,11 @@ cmd_graphs() {
 
     # Check prerequisites
     if ! command -v pcp2json >/dev/null 2>&1; then
-        echo "Error: pcp2json not found. Install pcp-export-pcp2json." >&2
+        echo "Error: pcp2json not found. Run: sudo dnf install -y pcp-export-pcp2json" >&2
+        return 1
+    fi
+    if ! python3 -c "from pcp import pmapi" 2>/dev/null; then
+        echo "Error: pcp Python module not found. Run: pip install pcp" >&2
         return 1
     fi
     if ! python3 -c "import matplotlib" 2>/dev/null; then
