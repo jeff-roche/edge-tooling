@@ -165,6 +165,7 @@ cmd_submit() {
     [[ -z "${workdir}" ]] && { echo "Error: --workdir is required" >&2; return 1; }
     [[ -z "${jira_key}" ]] && { echo "Error: --jira-key is required" >&2; return 1; }
     [[ -z "${summary}" ]] && { echo "Error: --summary is required" >&2; return 1; }
+    [[ -z "${rationale}" ]] && { echo "Error: --rationale is required" >&2; return 1; }
 
     local repo_dir="${workdir}/microshift"
     cd "${repo_dir}"
@@ -223,7 +224,7 @@ Fix for [${jira_key}](https://issues.redhat.com/browse/${jira_key}).
 
 ## Rationale
 
-${rationale:-No rationale provided.}
+${rationale}
 
 ## Changed files
 
