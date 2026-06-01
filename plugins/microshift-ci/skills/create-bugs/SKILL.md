@@ -264,18 +264,22 @@ This writes `<WORKDIR>/analyze-ci-bug-candidates-merged-<SOURCE_TAG>.json`. Read
          (or "None found")
      ```
 
-   - Select the prompt template based on whether closed regressions were found:
+   - Select the prompt template based on which potential matches were found:
 
      ```text
-     # ACTION_PROMPT_WITH_REOPEN (use when closed regressions exist):
-     Action? [c]reate / [s]kip / [l]ink-to-existing <JIRA-KEY> / [r]eopen <JIRA-KEY>:
+     # When open duplicates AND closed regressions exist:
+     Action? [c]reate / [s]kip / [u]pdate <JIRA-KEY> / [l]ink-to-existing <JIRA-KEY> / [r]eopen <JIRA-KEY>:
 
-     # ACTION_PROMPT_NO_REOPEN (use when no closed regressions exist):
+     # When open duplicates exist but no closed regressions:
+     Action? [c]reate / [s]kip / [u]pdate <JIRA-KEY> / [l]ink-to-existing <JIRA-KEY>:
+
+     # When no open duplicates AND no closed regressions:
      Action? [c]reate / [s]kip / [l]ink-to-existing <JIRA-KEY>:
      ```
 
    - **create**: Proceed to Step 4
    - **skip**: Skip this candidate, move to next
+   - **update**: Validate the provided JIRA key by calling `mcp__jira__jira_get_issue(issue_key=<JIRA-KEY>)` to confirm the issue exists, then verify that the key matches one of the candidate's open duplicates from the Jira search. If validation fails (key not found or not in the candidate's open duplicates list), show an error (e.g., `"JIRA key <JIRA-KEY> not eligible for update — must be an open duplicate"`) and re-prompt with the same `Action?` choices. If validation passes, proceed to Step 4b.
    - **link-to-existing**: Validate the key by calling `mcp__jira__jira_get_issue(issue_key=<JIRA-KEY>)`. If the issue exists, record the key and move to next. If the call fails or returns not-found, show an error (e.g., `"JIRA key <JIRA-KEY> not found — check for typos"`) and re-prompt with the same `Action?` choices.
    - **reopen**: Validate the provided JIRA key before proceeding. Call `mcp__jira__jira_get_issue(issue_key=<JIRA-KEY>)` to confirm the issue exists, then verify that the key matches one of the candidate's closed regressions found in Search C, that the issue status is Closed or Verified, and that the issue type is Bug. If validation fails (key not found, not in the candidate's closed regression list, not in Closed/Verified state, or not a Bug), show an error (e.g., `"JIRA key <JIRA-KEY> not eligible for reopen — must be a Bug closed regression"`) and re-prompt with the same `Action?` choices. If validation passes, proceed to Step 4a.
 
@@ -286,6 +290,7 @@ This writes `<WORKDIR>/analyze-ci-bug-candidates-merged-<SOURCE_TAG>.json`. Read
 4. **In auto-create mode** (`--auto --create`):
    - Apply the auto-decision policy and execute actions — do NOT prompt the user
    - For candidates where decision is "create": proceed to Step 4
+   - For candidates where decision is "update": proceed to Step 4b
    - For candidates where decision is "skip": record the skip reason and move to next
    - Continue to Step 5
 
@@ -296,7 +301,7 @@ When `--auto` is active, apply these rules in order for each candidate:
 | Condition | Decision | Reason |
 |-----------|----------|--------|
 | `failure_type` is `"infrastructure"` | **Skip** | `"Infrastructure failure — not a product bug"` |
-| Has open duplicates from Jira search | **Skip** | `"Duplicate of <JIRA-KEY>"` |
+| Has open duplicates from Jira search | **Update** | `"Will update <JIRA-KEY> with new CI occurrences"` — target is the first entry in the candidate's `duplicates` array. Proceed to Step 4b. |
 | Has closed regressions but no open duplicates — and **all** job `finished` dates are **on or before** the regression's `updated` date | **Skip** | `"Stale failure predating fix for <JIRA-KEY> (updated <YYYY-MM-DD>)"` |
 | Has closed regressions but no open duplicates — and **any** job `finished` date is **after** the regression's `updated` date | **Create** | Add `"Potential regression of <JIRA-KEY>"` to the bug description's Additional Info section |
 | No duplicates, no regressions | **Create** | `"No existing duplicates"` |
@@ -319,10 +324,17 @@ As you process each candidate (applying auto-decision policy or prompting user),
     },
     {
       "error_signature": "<matches candidate's error_signature exactly>",
+      "action": "update",
+      "jira_key": "USHIFT-6938",
+      "skip_category": "",
+      "reason": "Will update USHIFT-6938 with new CI occurrences"
+    },
+    {
+      "error_signature": "<matches candidate's error_signature exactly>",
       "action": "skip",
       "jira_key": "",
-      "skip_category": "duplicate",
-      "reason": "Duplicate of USHIFT-6938"
+      "skip_category": "infrastructure",
+      "reason": "Infrastructure failure — not a product bug"
     }
   ]
 }
@@ -331,9 +343,9 @@ As you process each candidate (applying auto-decision policy or prompting user),
 All fields are required on every entry:
 
 - `error_signature`: must match the candidate's `error_signature` exactly
-- `action`: one of `create`, `skip`, `link`, `reopen`, `failed`
-- `jira_key`: the JIRA key for `create`/`link`/`reopen`; empty string `""` for `skip`/`failed`
-- `skip_category`: one of `duplicate`, `infrastructure`, `stale_regression` for `skip`; empty string `""` for other actions
+- `action`: one of `create`, `skip`, `link`, `reopen`, `update`, `failed`
+- `jira_key`: the JIRA key for `create`/`link`/`reopen`/`update`; empty string `""` for `skip`/`failed`
+- `skip_category`: one of `duplicate`, `infrastructure`, `stale_regression`, `up_to_date` for `skip`; empty string `""` for other actions. `up_to_date` occurs when an `update` action is demoted to `skip` during comment deduplication in Step 4b
 - `reason`: human-readable explanation, always non-empty
 
 Set `mode` to `"dry-run"` or `"create"` matching the current run mode. Set `date` to today's date (YYYY-MM-DD).
@@ -483,9 +495,73 @@ For each candidate where user chose "reopen":
 - If the transition fails, report error and ask user if they want to retry, create a new bug instead, or skip
 - Do NOT retry automatically
 
-### Step 4b: Update Bug Mapping Files (create mode only)
+### Step 4b: Update Existing Bug with Comment (create mode only)
 
-**Precondition**: At least one candidate had action `create` or `reopen` in Step 4/4a.
+**Precondition**: The candidate's action is `update` and the JIRA key has been validated (in Step 3).
+
+**Actions**:
+For each candidate where action is "update":
+
+1. **Comment deduplication** — check whether the bug already has up-to-date CI data:
+
+   a. Fetch the target bug's comments:
+
+      ```python
+      mcp__jira__jira_get_issue(issue_key="<JIRA-KEY>", fields="comment", comment_limit=10)
+      ```
+
+   b. Find the most recent comment containing the marker string `"CI Doctor: New occurrences detected"`.
+
+   c. Extract the `**Last observed:**` date (YYYY-MM-DD) from that comment.
+
+   d. If no CI Doctor comment exists, check the bug description as a fallback: if it contains `"CI job failures detected across MicroShift releases"` (i.e., it was created by CI Doctor), extract the `**Last observed:**` date from the description instead.
+
+   e. Compare against the candidate's most recent job `finished` date:
+      - If **all** job `finished` dates are **on or before** the last-observed date → the bug is already up-to-date. Change the action to `"skip"` with `skip_category="up_to_date"` and reason `"Already up-to-date on <JIRA-KEY> (last observed <YYYY-MM-DD>)"`. Move to the next candidate.
+      - If **any** job `finished` date is **after** the last-observed date, or no last-observed date was found → proceed to post the comment.
+
+2. **Construct the update comment**:
+
+   ```text
+   ## CI Doctor: New occurrences detected
+
+   This failure continues to be observed in CI.
+
+   **Error Signature:** <error_signature>
+   **Error Severity:** <severity>/5
+   **Number of affected jobs:** <count>
+   **Last observed:** <latest finished date>
+
+   **Affected Releases:**
+   - <release1> (<N> jobs)
+   - <release2> (<N> jobs)
+
+   **Affected Jobs:**
+   - [<job_name>](<job_url>)
+   ...
+
+   Updated automatically by /microshift-ci:create-bugs.
+   ```
+
+3. **Post the comment**:
+
+   ```python
+   mcp__jira__jira_add_comment(
+       issue_key="<JIRA-KEY>",
+       body="<update comment>"
+   )
+   ```
+
+4. **Record the result**: Store the updated issue key for the final report.
+
+**Error Handling**:
+
+- **Interactive mode** (no `--auto`): If MCP call fails, report error, ask user if they want to retry or skip. Do NOT retry automatically.
+- **Auto mode** (`--auto`): If MCP call fails, log the error, record the candidate as `"failed"` in the report, and continue to the next candidate. Do NOT prompt or retry.
+
+### Step 4c: Update Bug Mapping Files (create mode only)
+
+**Precondition**: At least one candidate had action `create` or `reopen` in Step 4/4a. (`update` actions only add a comment and do not require mapping file updates.)
 
 After all bugs are created/reopened, update the per-source bug mapping files (`<WORKDIR>/analyze-ci-bugs-<source>.json`) so that newly created bugs are reflected in the JIRA data consumed by the HTML report generator.
 
