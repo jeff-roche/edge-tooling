@@ -591,7 +591,7 @@ def merge_candidate_files(filepaths, workdir=None):
 # Report generation
 # ---------------------------------------------------------------------------
 
-VALID_ACTIONS = {"create", "skip", "link", "reopen", "update", "failed"}
+VALID_ACTIONS = {"create", "skip", "update", "failed"}
 VALID_SKIP_CATEGORIES = {"duplicate", "infrastructure", "stale_regression", "up_to_date"}
 JIRA_URL_BASE = "https://redhat.atlassian.net/browse"
 SEPARATOR = "=" * 63
@@ -636,7 +636,7 @@ def _validate_results(results_data, candidates_data):
 
         if "jira_key" not in r:
             errors.append(f"{prefix}: missing jira_key field")
-        elif mode == "create" and action in ("create", "link", "reopen") and not r["jira_key"]:
+        elif mode == "create" and action in ("create", "update") and not r["jira_key"]:
             errors.append(f"{prefix}: {action} action requires non-empty jira_key")
 
         if "skip_category" not in r:
@@ -715,8 +715,6 @@ def _compute_summary_counters(results):
         "skip_infrastructure": 0,
         "skip_stale_regression": 0,
         "skip_up_to_date": 0,
-        "link": 0,
-        "reopen": 0,
         "update": 0,
         "failed": 0,
     }
@@ -770,8 +768,6 @@ def format_report(candidates_data, results_data):
             action_labels = {
                 "create": f"{jira_key} (CREATED)",
                 "skip": "SKIPPED",
-                "link": f"{jira_key} (LINKED)",
-                "reopen": f"{jira_key} (REOPENED)",
                 "update": f"{jira_key} (UPDATED)",
                 "failed": "FAILED",
             }
@@ -794,7 +790,7 @@ def format_report(candidates_data, results_data):
         if jobs_block:
             lines.append(jobs_block)
 
-        if not is_dry_run and jira_key and action in ("create", "link", "reopen", "update"):
+        if not is_dry_run and jira_key and action in ("create", "update"):
             lines.append(f"     URL: {JIRA_URL_BASE}/{jira_key}")
 
         lines.append(f"     Decision: {r['reason']}")
@@ -817,15 +813,12 @@ def format_report(candidates_data, results_data):
             "",
             "To create these bugs, run:",
             f"  /microshift-ci:create-bugs {sources_str} --create",
-            f"  /microshift-ci:create-bugs {sources_str} --auto --create",
         ])
     else:
         lines.extend([
             f"  Created: {counters['create']}",
             f"  Updated: {counters['update']}",
             f"  Skipped: {counters['skip_duplicate'] + counters['skip_infrastructure'] + counters['skip_stale_regression'] + counters['skip_up_to_date']}",
-            f"  Linked to existing: {counters['link']}",
-            f"  Reopened: {counters['reopen']}",
             f"  Failed: {counters['failed']}",
         ])
 

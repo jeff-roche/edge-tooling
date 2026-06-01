@@ -53,7 +53,7 @@ Compute once at the start by running `date +%y%m%d` and substituting into the pa
 
    ```text
    Error: bug mapping files missing for: <sources>
-   Run the full create-bugs workflow first: /microshift-ci:create-bugs <sources> --create --auto
+   Run the full create-bugs workflow first: /microshift-ci:create-bugs <sources> --create
    ```
 
    Continue to Step 3 anyway — the HTML report will be generated with whatever data is available.
