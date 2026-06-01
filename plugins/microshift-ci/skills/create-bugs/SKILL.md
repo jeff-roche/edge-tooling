@@ -298,7 +298,7 @@ All fields are required on every entry:
 - `error_signature`: must match the candidate's `error_signature` exactly
 - `action`: one of `create`, `skip`, `update`, `failed`
 - `jira_key`: the JIRA key for `create`/`update`; empty string `""` for `skip`/`failed`
-- `skip_category`: one of `duplicate`, `infrastructure`, `stale_regression`, `up_to_date` for `skip`; empty string `""` for other actions. `up_to_date` occurs when an `update` action is demoted to `skip` during comment deduplication in Step 4b
+- `skip_category`: one of `infrastructure`, `stale_regression`, `up_to_date` for `skip`; empty string `""` for other actions. `up_to_date` occurs when an `update` action is demoted to `skip` during comment deduplication in Step 4b
 - `reason`: human-readable explanation, always non-empty
 
 Set `mode` to `"dry-run"` or `"create"` matching the current run mode. Set `date` to today's date (YYYY-MM-DD).
@@ -398,7 +398,7 @@ For each candidate where action is "update":
    a. Fetch the target bug's comments:
 
       ```python
-      mcp__jira__jira_get_issue(issue_key="<JIRA-KEY>", fields="comment", comment_limit=10)
+      mcp__jira__jira_get_issue(issue_key="<JIRA-KEY>", fields="comment", comment_limit=100)
       ```
 
    b. Find the most recent comment containing the marker string `"CI Doctor: New occurrences detected"`.

@@ -592,7 +592,7 @@ def merge_candidate_files(filepaths, workdir=None):
 # ---------------------------------------------------------------------------
 
 VALID_ACTIONS = {"create", "skip", "update", "failed"}
-VALID_SKIP_CATEGORIES = {"duplicate", "infrastructure", "stale_regression", "up_to_date"}
+VALID_SKIP_CATEGORIES = {"infrastructure", "stale_regression", "up_to_date"}
 JIRA_URL_BASE = "https://redhat.atlassian.net/browse"
 SEPARATOR = "=" * 63
 
@@ -711,7 +711,6 @@ def _compute_summary_counters(results):
     """Compute summary counters from results list."""
     counters = {
         "create": 0,
-        "skip_duplicate": 0,
         "skip_infrastructure": 0,
         "skip_stale_regression": 0,
         "skip_up_to_date": 0,
@@ -807,7 +806,6 @@ def format_report(candidates_data, results_data):
             f"  Would create: {counters['create']}",
             f"  Would update: {counters['update']}",
             f"  Would skip (already up-to-date): {counters['skip_up_to_date']}",
-            f"  Would skip (Jira duplicate): {counters['skip_duplicate']}",
             f"  Would skip (infrastructure): {counters['skip_infrastructure']}",
             f"  Would skip (stale regression): {counters['skip_stale_regression']}",
             "",
@@ -818,7 +816,7 @@ def format_report(candidates_data, results_data):
         lines.extend([
             f"  Created: {counters['create']}",
             f"  Updated: {counters['update']}",
-            f"  Skipped: {counters['skip_duplicate'] + counters['skip_infrastructure'] + counters['skip_stale_regression'] + counters['skip_up_to_date']}",
+            f"  Skipped: {counters['skip_infrastructure'] + counters['skip_stale_regression'] + counters['skip_up_to_date']}",
             f"  Failed: {counters['failed']}",
         ])
 
