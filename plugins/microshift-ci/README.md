@@ -24,19 +24,22 @@ Analyze MicroShift CI failures, produce HTML reports, and create JIRA bugs.
 ## Usage
 
 ### Full pipeline
+
 ```text
 /microshift-ci:doctor 4.19,4.20,4.21,4.22
 ```
 
 ### Single job analysis
+
 ```text
 /microshift-ci:prow-job https://prow.ci.openshift.org/view/gs/test-platform-results/logs/<job-name>/<job-id>
 ```
 
 ### Create bugs from analysis
+
 ```text
 /microshift-ci:create-bugs 4.22           # dry-run
-/microshift-ci:create-bugs 4.22 --create  # interactive creation
+/microshift-ci:create-bugs 4.22 --create  # create/update bugs
 ```
 
 ## Requirements
