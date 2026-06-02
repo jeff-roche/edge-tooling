@@ -12,14 +12,14 @@
 A periodic Prow job (`periodic-ci-openshift-eng-edge-tooling-main-microshift-ci-doctor`)
 runs daily and performs these phases automatically:
 
-1. **Analysis** - `/microshift-ci:doctor <releases>` (45 min, 100 turns)
-2. **Bug creation** - `/microshift-ci:create-bugs <releases> --create --auto`
-   (10 min, 50 turns)
-3. **Fix test bugs dry-run** - `/microshift-ci:fix-test-bugs --open`
+1. **Close duplicate rebase PRs** - closes older rebase PRs superseded by newer ones
+2. **Analysis** - `/microshift-ci:doctor <releases>` (35 min, 100 turns)
+3. **Bug creation** - `/microshift-ci:create-bugs <releases> --create`
+   (15 min, 50 turns)
+4. **Fix test bugs dry-run** - `/microshift-ci:fix-test-bugs --open`
    (5 min, 20 turns) - reports which bugs are eligible for auto-fix
-4. **Report refresh** - `/microshift-ci:doctor-refresh <releases>`
+5. **Report refresh** - `/microshift-ci:doctor-refresh <releases>`
    (5 min, 30 turns) - re-generates the HTML report with new bug links
-5. **Close duplicate rebase PRs** - closes older rebase PRs superseded by newer ones
 6. **Rebase PR restart** - restarts failed rebase bot PR tests
 
 The job produces an HTML report, per-job analysis files, bug mapping JSON,
@@ -114,10 +114,10 @@ Gates:
 To attempt fixes (opens draft PRs in openshift/microshift):
 
 ```text
-/microshift-ci:fix-test-bugs --open --fix --auto
+/microshift-ci:fix-test-bugs --open --fix
 ```
 
-`--auto` attempts all eligible fixes without prompting.
+`--fix` attempts all eligible fixes without prompting.
 Each fix gets its own branch and draft PR for independent review.
 
 Can also target specific bugs:
