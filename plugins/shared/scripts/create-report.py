@@ -295,7 +295,7 @@ document.querySelectorAll('.bugs-table').forEach(function(table) {
             sortBy(colIdx, !th.classList.contains('sort-asc'));
         });
     });
-    if (headers.length) sortBy(headers.length - 1, false);
+    if (headers.length >= 2) sortBy(headers.length - 2, false);
 });"""
 
 
@@ -586,7 +586,7 @@ def _render_bugs_table(bugs, show_releases=True):
     cols = '<th>JIRA</th><th>Status</th><th>Assignee</th><th>Summary</th>'
     if show_releases:
         cols += '<th>Releases</th>'
-    cols += '<th>Updated</th>'
+    cols += '<th>Updated</th><th></th>'
     lines.append(f'                {cols}')
     lines.append("            </tr></thead>")
     lines.append("            <tbody>")
@@ -597,7 +597,8 @@ def _render_bugs_table(bugs, show_releases=True):
         status = _e(bug.get("status", ""))
         assignee = _e(bug.get("assignee", ""))
         updated = _e(bug.get("updated", ""))
-        lines.append("            <tr>")
+        anchor_id = f'bug-{key}'
+        lines.append(f'            <tr id="{anchor_id}">')
         lines.append(f'                <td><a href="{href}" target="_blank">{key}</a></td>')
         lines.append(f"                <td>{status}</td>")
         lines.append(f"                <td>{assignee}</td>")
@@ -606,6 +607,7 @@ def _render_bugs_table(bugs, show_releases=True):
             releases_cell = _format_release_links(bug["links"]) if bug.get("links") else ""
             lines.append(f"                <td>{releases_cell}</td>")
         lines.append(f"                <td>{updated}</td>")
+        lines.append(f'                <td><a href="#{anchor_id}" class="anchor-link" title="Copy link to this bug">&#128279;</a></td>')
         lines.append("            </tr>")
     lines.append("            </tbody>")
     lines.append("            </table>")
