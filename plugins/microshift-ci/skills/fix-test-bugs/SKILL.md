@@ -3,7 +3,7 @@ name: microshift-ci:fix-test-bugs
 argument-hint: [--open | <USHIFT-1234>[,<USHIFT-5678>,...]] [--fix]
 description: Attempt to fix CI bugs by opening PRs in openshift/microshift (dry-run by default)
 user-invocable: true
-allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent, mcp__jira__jira_get_issue, mcp__jira__jira_search
+allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent, mcp__jira__jira_search
 ---
 
 # microshift-ci:fix-test-bugs
@@ -39,7 +39,7 @@ Compute once at the start by running `date +%y%m%d` and substituting into the pa
 /tmp/microshift-ci-claude-workdir.<YYMMDD>
 ```
 
-The repo clone lives at `<WORKDIR>/microshift/` (shared with other skills).
+Create `<WORKDIR>/fix-test-bugs/` at the start of the skill for intermediate files. The repo clone lives at `<WORKDIR>/microshift/` (shared with other skills).
 
 ## Prerequisites
 
@@ -67,16 +67,31 @@ Evaluated in order per bug. Must pass all gates to be eligible.
 2. Validate:
    - If neither `--open` nor explicit bug keys were provided, show error: "Error: must specify either --open or one or more USHIFT bug keys" and stop
    - If `--open` is present with explicit keys, show error and stop
-3. Compute the issue list:
-   - If `--open`: query JIRA to discover keys:
+3. Fetch all bug details in a single `mcp__jira__jira_search` call:
+
+   - If `--open`:
 
      ```text
-     mcp__jira__jira_search(jql='labels = "microshift-ci-ai-generated" AND resolution = Unresolved', fields='summary', limit=100)
+     mcp__jira__jira_search(
+       jql='labels = "microshift-ci-ai-generated" AND resolution = Unresolved',
+       fields='summary,description,status,priority,assignee,labels,created,updated',
+       limit=50
+     )
      ```
 
-     Extract issue keys from the results. If none found, report "No unresolved AI-generated bugs found" and stop.
-   - If explicit keys: use those directly.
-4. Fetch bug details for all keys in parallel via `mcp__jira__jira_get_issue(issue_key=<key>)`
+     Paginate with `start_at` if more than 50 results. If none found, report "No unresolved AI-generated bugs found" and stop.
+
+   - If explicit keys (e.g., `USHIFT-7126,USHIFT-7057`):
+
+     ```text
+     mcp__jira__jira_search(
+       jql='key in (USHIFT-7126, USHIFT-7057)',
+       fields='summary,description,status,priority,assignee,labels,created,updated',
+       limit=50
+     )
+     ```
+
+4. For each issue in the search results, **immediately** save the complete response to `<WORKDIR>/fix-test-bugs/bug-<key>.json`. The saved JSON must contain all fields returned — at minimum: `key`, `summary`, `description` (the full bug description text), `status`, `priority`, `assignee`, `labels`, `created`, and `updated`. Write the complete response — do not summarize or omit fields.
 5. Apply Gates 1-3 to each bug and record status: `eligible` or `skipped` (with gate and reason)
 
 ### Step 2: Present Dry-Run Report
