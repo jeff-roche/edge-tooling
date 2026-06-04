@@ -5,7 +5,7 @@ Evaluates whether MicroShift should participate in upcoming OCP X, Y, or Z
 releases by checking lifecycle status, OCP availability, advisory CVEs,
 code changes, and the 90-day rule.
 
-Usage: precheck_xyz.py [version...] [--verbose]
+Usage: precheck_xyz.py <version...> [--verbose] [--json]
 """
 
 import argparse
@@ -710,7 +710,7 @@ def format_text_full(output):
 
 def main():
     parser = argparse.ArgumentParser(description="MicroShift X/Y/Z release evaluation")
-    parser.add_argument("versions", nargs="*", help="X.Y or X.Y.Z versions")
+    parser.add_argument("versions", nargs="+", help="X.Y or X.Y.Z versions")
     parser.add_argument("--verbose", action="store_true",
                         help="Show detailed tables instead of one-line summary")
     parser.add_argument("--json", action="store_true", dest="json_output",
@@ -748,33 +748,7 @@ def main():
         sys.exit(1)
 
     # Step 2: Determine versions to evaluate
-    if args.versions:
-        versions = expand_versions(args.versions, lifecycle_data)
-    else:
-        # No versions specified: query ART Jira for releases due within 7 days
-        logger.info("Querying ART Jira for releases due within 7 days...")
-        art_tickets = art_jira.query_art_releases_due(days_ahead=7)
-        versions = []
-        for ticket in art_tickets:
-            v = ticket["version"]
-            minor = ".".join(v.split(".")[:2])
-            if lifecycle.is_version_active(minor, lifecycle_data):
-                versions.append(v)
-        if not versions:
-            logger.info("No ART releases due within 7 days")
-
-    # Filter out EOL versions (auto-discovered only; explicit versions always evaluated)
-    if not args.versions:
-        active_versions = []
-        for v in versions:
-            minor = ".".join(v.split(".")[:2])
-            if lifecycle.is_version_active(minor, lifecycle_data):
-                active_versions.append(v)
-            else:
-                lc = lifecycle.get_lifecycle_status(minor, lifecycle_data)
-                phase = lc["phase"] if lc else "unknown"
-                logger.info("Skipping %s (%s)", v, phase)
-        versions = active_versions
+    versions = expand_versions(args.versions, lifecycle_data)
 
     # Step 3: Evaluate each version (parallel when multiple)
     evaluations = []

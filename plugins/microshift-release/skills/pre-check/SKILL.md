@@ -3,7 +3,7 @@ name: microshift-release:pre-check
 argument-hint: [Z|X|Y|RC|EC|nightly] [version|time-range...] [--verbose]
 description: Check OCP release schedule, verify availability, evaluate z-stream need, or check nightly build gaps
 user-invocable: true
-allowed-tools: Bash, mcp__productpages__browse_schedule, mcp__productpages__list_entities, mcp__atlassian__getJiraIssue, mcp__atlassian__searchJiraIssuesUsingJql
+allowed-tools: Bash, mcp__atlassian__getJiraIssue, mcp__atlassian__searchJiraIssuesUsingJql
 ---
 
 # microshift-release:pre-check
@@ -20,16 +20,15 @@ MicroShift ships as a layered product on top of OCP. Every time OCP releases a n
 
 This command automates that evaluation (Phase 0 of the release process). It checks lifecycle status, OCP payload availability, advisory CVEs, nightly build gaps, and EC/RC readiness — then outputs a clear action per version: OK, SKIP, ASK ART, NEEDS REVIEW, or ALREADY RELEASED.
 
-When a time range is provided (e.g., "this week"), it queries Red Hat Product Pages for OCP versions scheduled in that period and evaluates each one.
+When a time range is provided (e.g., "this week"), it queries ART Jira for OCP release tickets due in that period and evaluates each one.
 
 ## Prerequisites
 
 | Requirement | Needed for | Mandatory? |
 |---|---|---|
 | VPN | Brew RPM checks (nightly, EC/RC), advisory report | Yes for nightly/ecrc — xyz degrades gracefully (skips advisory, 90-day rule) |
-| Atlassian MCP | OCPBUGS enrichment, ART ticket queries | Yes — required to analyze OCPBUGS resolution and release action |
+| Atlassian MCP | OCPBUGS enrichment, ART ticket queries, time range lookups | Yes — required to analyze OCPBUGS resolution and release action |
 | `GITLAB_API_TOKEN` | Advisory report for 4.20+ (shipment MR data) | No — advisory skipped for 4.20+ without it |
-| Product Pages MCP | Time range lookups (e.g., "this week") | Only when using time ranges — not needed for explicit versions |
 
 ## Arguments
 
@@ -37,9 +36,9 @@ When a time range is provided (e.g., "this week"), it queries Red Hat Product Pa
 - `version` (optional): Specific version (e.g., `4.19.27`) or minor stream (e.g., `4.21`)
 - `time-range` (optional): Natural language time range instead of explicit versions. Detected by keywords like:
   - `today`, `tomorrow`
-  - `this week`, `next week`, `last week`
+  - `this week`, `next week`
   - `next 3 days`, `next 7 days`
-  - `April`, `this month`
+  - `this month`
 - `--verbose` (optional): Show extra detail (tables for xyz, NVR/nightly names for nightly, next versions for EC/RC).
 
 ## Scripts Directory
@@ -60,38 +59,34 @@ SCRIPTS_DIR=plugins/microshift-release/scripts
 4. Identify `--verbose` flag
 5. **Default**: If no release_type found, default to `Z` and treat version/time-range tokens accordingly
 
-### Step 2: Resolve Versions from Product Pages (when time range is detected)
+### Step 2: Resolve Versions via ART Jira (when time range is detected)
 
-If a time range is present instead of explicit versions, query Product Pages to find OCP z-stream versions scheduled in that period:
+If a time range is present instead of explicit versions, query ART Jira for release tickets due in that window:
 
-1. **Convert the time range** to concrete dates (date_from, date_to) based on today's date
-2. **Find active OCP z-release entities**: Use `mcp__productpages__list_entities` with `public_parent_id=146` (OCP product), `kind="release"`, `shortname="%z"`, `is_maintained=True`. Filter results to 4.14+ only (MicroShift GA'd at 4.14 — older z-release entities have no MicroShift images).
-3. **For each z-release entity**: Call `mcp__productpages__browse_schedule` and find tasks where:
-   - `flags` contains `"ga"` (these are the "X.Y.Z in Fast Channel" milestones)
-   - `date_finish` falls within [date_from, date_to]
-   - Extract the version from the task name (e.g., "4.21.10 in Fast Channel" → `4.21.10`)
-4. **Collect all matching versions** across all streams and pass them to the xyz script
+1. **Convert the time range** to concrete dates (`date_from`, `date_to`) based on today's date:
+   - `today` → today only
+   - `tomorrow` → tomorrow only
+   - `this week` → Monday through Sunday of the current week
+   - `next week` → next Monday through next Sunday
+   - `next N days` → today through N days from now
+   - `this month` → today through end of current month
+   - For any other natural language range, compute the appropriate date window
 
-If the `mcp__productpages__list_entities` tool is not available (MCP not loaded), stop and show this message verbatim:
+2. **Query ART Jira** using `mcp__atlassian__searchJiraIssuesUsingJql`:
 
-````text
-The Product Pages MCP is required for time-range lookups but is not enabled in this session.
+   ```text
+   JQL: project = ART AND issuetype = Story AND summary ~ "Release 4." AND duedate >= "{date_from}" AND duedate <= "{date_to}" ORDER BY duedate ASC
+   ```
 
-To enable it, run this command:
+   Use `cloudId: "redhat.atlassian.net"` for the Atlassian MCP tool.
 
-```bash
-claude mcp add productpages -s user --transport http https://productpages.redhat.com/mcp --header "X-MCP-Realm: urn:mcp:realm:private-core"
-```
+3. **Extract versions** from ticket summaries. ART release tickets use the format `"Release X.Y.Z [YYYY-Mon-DD]"` (e.g., `"Release 4.21.18 [2026-Jun-02]"`). Extract the `X.Y.Z` version from each matching ticket.
 
-Then restart Claude Code and re-run the command.
+4. **Filter to 4.14+** only (MicroShift GA'd at 4.14 — older versions have no MicroShift images).
 
-Alternatively, pass explicit versions instead of a time range:
-```
-  /microshift-release:pre-check 4.19.X 4.20.X 4.21.X
-```
-````
+5. **Pass the resolved versions** as explicit arguments to the script in Step 4.
 
-If no versions found in the schedule, report "No OCP releases scheduled in \<range\>."
+If no ART tickets are found in the date range, report "No OCP releases scheduled in {range}."
 
 ### Step 3: Query ART Tickets via MCP
 
@@ -197,13 +192,6 @@ If the script exits non-zero, display stderr and suggest:
 /microshift-release:pre-check RC                          # latest RC status
 /microshift-release:pre-check nightly EC RC               # combined report
 ```
-
-## Product Pages Reference
-
-- OCP product entity ID: **146** (from `search_entities("OpenShift Container Platform", kind="product")` — hardcoded to skip one API call)
-- Z-release entities: `openshift-X.Y.z` (e.g., `openshift-4.21.z`)
-- Schedule tasks with `"ga"` flag = version GA dates ("X.Y.Z in Fast Channel")
-- `date_finish` on ga-flagged tasks = release date
 
 ## Notes
 
