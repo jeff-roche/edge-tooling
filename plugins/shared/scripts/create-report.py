@@ -579,6 +579,39 @@ def _bug_sort_key(bug):
     return (prio, bug.get("key", ""))
 
 
+def _render_bugs_table(bugs, show_releases=True):
+    lines = []
+    lines.append('            <table class="bugs-table">')
+    lines.append("            <thead><tr>")
+    cols = '<th>JIRA</th><th>Status</th><th>Assignee</th><th>Summary</th>'
+    if show_releases:
+        cols += '<th>Releases</th>'
+    cols += '<th>Updated</th>'
+    lines.append(f'                {cols}')
+    lines.append("            </tr></thead>")
+    lines.append("            <tbody>")
+    for bug in bugs:
+        key = _e(bug["key"])
+        href = f"https://issues.redhat.com/browse/{key}"
+        summary = _e(bug.get("summary", ""))
+        status = _e(bug.get("status", ""))
+        assignee = _e(bug.get("assignee", ""))
+        updated = _e(bug.get("updated", ""))
+        lines.append("            <tr>")
+        lines.append(f'                <td><a href="{href}" target="_blank">{key}</a></td>')
+        lines.append(f"                <td>{status}</td>")
+        lines.append(f"                <td>{assignee}</td>")
+        lines.append(f"                <td>{summary}</td>")
+        if show_releases:
+            releases_cell = _format_release_links(bug["links"]) if bug.get("links") else ""
+            lines.append(f"                <td>{releases_cell}</td>")
+        lines.append(f"                <td>{updated}</td>")
+        lines.append("            </tr>")
+    lines.append("            </tbody>")
+    lines.append("            </table>")
+    return lines
+
+
 def render_bugs_section(bugs_data):
     """Render the Bugs tab HTML."""
     linked = bugs_data["linked"]
@@ -628,41 +661,15 @@ def render_bugs_section(bugs_data):
             "Run the full doctor workflow to include all open AI-generated bugs.</p>"
         )
 
-    # Table
-    all_bugs = sorted(linked, key=_bug_sort_key) + sorted(unlinked, key=_bug_sort_key)
+    # Linked table
+    if linked:
+        lines.append('            <h3>Linked to Failures</h3>')
+        lines.extend(_render_bugs_table(sorted(linked, key=_bug_sort_key), show_releases=True))
 
-    if all_bugs:
-        lines.append('            <table class="bugs-table">')
-        lines.append("            <thead><tr>")
-        lines.append('                <th>JIRA</th><th>Status</th><th>Assignee</th><th>Summary</th>')
-        lines.append('                <th>Releases</th><th>Updated</th>')
-        lines.append("            </tr></thead>")
-        lines.append("            <tbody>")
-
-        for bug in all_bugs:
-            key = _e(bug["key"])
-            href = f"https://issues.redhat.com/browse/{key}"
-            summary = _e(bug.get("summary", ""))
-            status = _e(bug.get("status", ""))
-            assignee = _e(bug.get("assignee", ""))
-            updated = _e(bug.get("updated", ""))
-
-            if bug.get("links"):
-                releases_cell = _format_release_links(bug["links"])
-            else:
-                releases_cell = '<span class="link-badge link-badge-unlinked">NOT LINKED</span>'
-
-            lines.append("            <tr>")
-            lines.append(f'                <td><a href="{href}" target="_blank">{key}</a></td>')
-            lines.append(f"                <td>{status}</td>")
-            lines.append(f"                <td>{assignee}</td>")
-            lines.append(f"                <td>{summary}</td>")
-            lines.append(f"                <td>{releases_cell}</td>")
-            lines.append(f"                <td>{updated}</td>")
-            lines.append("            </tr>")
-
-        lines.append("            </tbody>")
-        lines.append("            </table>")
+    # Unlinked table
+    if unlinked and jira_available:
+        lines.append('            <h3>Not Linked</h3>')
+        lines.extend(_render_bugs_table(sorted(unlinked, key=_bug_sort_key), show_releases=False))
 
     lines.append("        </div>")
     return "\n".join(lines)
