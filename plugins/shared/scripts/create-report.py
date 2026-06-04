@@ -88,6 +88,9 @@ CSS = """\
         .toc li { padding: 5px 0; }
         .toc a { color: #0366d6; text-decoration: none; }
         .toc a:hover { text-decoration: underline; }
+        .toc-header { display: flex; justify-content: space-between; align-items: center; }
+        .filter-toggle { cursor: pointer; user-select: none; font-size: 0.9em; color: #6c757d; font-weight: 400; }
+        .filter-toggle input[type="checkbox"] { margin-right: 5px; vertical-align: middle; }
         .timestamp { color: #6c757d; font-size: 0.9em; }
         a { color: #0366d6; }
         .tab-bar { display: flex; gap: 0; margin: 20px 0 0 0; border-bottom: 2px solid #dee2e6; }
@@ -160,6 +163,48 @@ document.querySelectorAll('.col-title').forEach(function(el) {
 function toggleGraph(id) {
     var el = document.getElementById(id);
     if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+function filterToday(on) {
+    var today = new Date().toISOString().split('T')[0];
+    document.querySelectorAll('#tab-periodics .issue-row').forEach(function(row) {
+        var dates = (row.getAttribute('data-dates') || '').split(' ');
+        var show = !on || dates.indexOf(today) !== -1;
+        row.style.display = show ? '' : 'none';
+        var detail = row.nextElementSibling;
+        if (detail && detail.classList.contains('detail-row')) {
+            if (!show) detail.classList.remove('show');
+            detail.style.display = show ? '' : 'none';
+        }
+    });
+    document.querySelectorAll('#tab-periodics .release-section').forEach(function(sec) {
+        var id = sec.id.replace('release-', '');
+        var rows = sec.querySelectorAll('.issue-row');
+        var total = 0, bd = {build: 0, test: 0, infra: 0};
+        rows.forEach(function(r) {
+            if (r.style.display !== 'none') {
+                total++;
+                var ft = r.querySelector('.col-ftype .ftype-badge');
+                if (ft) {
+                    var t = ft.textContent.trim().toLowerCase();
+                    if (t === 'build') bd.build++;
+                    else if (t === 'infra') bd.infra++;
+                    else bd.test++;
+                }
+            }
+        });
+        var lbl = total === 1 ? 'failure' : 'failures';
+        var summary = total + ' ' + lbl + ' (' + bd.build + ' build, ' + bd.test + ' test, ' + bd.infra + ' infra)';
+        var toc = document.querySelector('.toc-counts[data-release="' + id + '"]');
+        if (toc) toc.textContent = summary;
+        var badge = sec.querySelector('.release-badge');
+        if (badge) badge.textContent = total + ' ' + lbl;
+        var bdb = sec.querySelector('.bd-build');
+        var bdt = sec.querySelector('.bd-test');
+        var bdi = sec.querySelector('.bd-infra');
+        if (bdb) bdb.textContent = bd.build;
+        if (bdt) bdt.textContent = bd.test;
+        if (bdi) bdi.textContent = bd.infra;
+    });
 }
 function showGraphTab(btn, paneId) {
     var container = btn.closest('.perf-graphs');
@@ -808,12 +853,12 @@ def render_release_section(version, rdata, bug_candidates):
     lines.append('            <div class="release-header">')
     lines.append(f'                <h2>Release {_e(version)}<a href="#release-{_e(version)}" class="section-anchor" title="Copy link to this section">&#128279;</a></h2>')
     label = "failure" if total == 1 else "failures"
-    lines.append(f'                <span class="badge {badge}">{total} {label}</span>')
+    lines.append(f'                <span class="badge {badge} release-badge" data-release="{_e(version)}">{total} {label}</span>')
     lines.append("            </div>")
     lines.append('            <div class="breakdown">')
-    lines.append(f'                <span class="breakdown-item"><strong>{b["build"]}</strong> Build</span>')
-    lines.append(f'                <span class="breakdown-item"><strong>{b["test"]}</strong> Test</span>')
-    lines.append(f'                <span class="breakdown-item"><strong>{b["infrastructure"]}</strong> Infrastructure</span>')
+    lines.append(f'                <span class="breakdown-item"><strong class="bd-build">{b["build"]}</strong> Build</span>')
+    lines.append(f'                <span class="breakdown-item"><strong class="bd-test">{b["test"]}</strong> Test</span>')
+    lines.append(f'                <span class="breakdown-item"><strong class="bd-infra">{b["infrastructure"]}</strong> Infrastructure</span>')
     lines.append("            </div>")
 
     lines.append('            <table class="issues-table">')
@@ -827,8 +872,10 @@ def render_release_section(version, rdata, bug_candidates):
         ftype_css = "ftype-infra" if ftype == "infrastructure" else f"ftype-{ftype}"
         jobs_label = f'{jc} {"job" if jc == 1 else "jobs"}'
 
+        job_dates = sorted({j["date"][:10] for j in issue.get("affected_jobs", []) if j.get("date")})
+        dates_attr = f' data-dates="{" ".join(job_dates)}"' if job_dates else ""
         anchor_id = f'release-{_e(version)}-{issue["number"]}'
-        lines.append(f'            <tr class="issue-row" id="{anchor_id}">')
+        lines.append(f'            <tr class="issue-row" id="{anchor_id}"{dates_attr}>')
         lines.append(f'                <td class="col-sev"><span class="severity-badge {sev_css}">{sev}</span></td>')
         lines.append(f'                <td class="col-ftype"><span class="ftype-badge {ftype_css}">{ftype_label}</span></td>')
         lines.append(f'                <td class="col-title">{_e(issue["title"])}</td>')
@@ -1065,7 +1112,9 @@ def generate_html(component_title, releases_data, all_bug_candidates, pr_data, p
             b = rdata["breakdown"]
             toc.append(
                 f'                <li><a href="#release-{_e(version)}">Release {_e(version)}</a> &mdash; '
-                f'{rdata["total_failed"]} failures ({b["build"]} build, {b["test"]} test, {b["infrastructure"]} infra)</li>'
+                f'<span class="toc-counts" data-release="{_e(version)}">'
+                f'{rdata["total_failed"]} failures ({b["build"]} build, {b["test"]} test, {b["infrastructure"]} infra)'
+                f'</span></li>'
             )
         else:
             toc.append(f'                <li><a href="#release-{_e(version)}">Release {_e(version)}</a> &mdash; no data</li>')
@@ -1105,7 +1154,10 @@ def generate_html(component_title, releases_data, all_bug_candidates, pr_data, p
 
     <div id="tab-periodics" class="tab-content active">
         <div class="toc">
-            <h3>Table of Contents</h3>
+            <div class="toc-header">
+                <h3>Table of Contents</h3>
+                <label class="filter-toggle"><input type="checkbox" id="filter-today" onchange="filterToday(this.checked)"> Today only</label>
+            </div>
             <ul>
 {chr(10).join(toc)}
             </ul>
