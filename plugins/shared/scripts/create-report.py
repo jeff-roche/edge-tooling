@@ -48,6 +48,7 @@ CSS = """\
         h1 { color: #1a1a2e; border-bottom: 3px solid #e94560; padding-bottom: 8px; font-size: 1.4em; margin: 10px 0; }
         h2 { font-size: 1.15em; margin: 0; }
         h3 { font-size: 1.05em; margin: 0 0 8px 0; }
+        .release-section h3 { margin: 18px 0 4px 0; }
         .release-section { background: white; border-radius: 8px; padding: 15px; margin: 15px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .release-header { display: flex; justify-content: space-between; align-items: center; }
         .release-header h2 { color: #16213e; margin: 0; }
@@ -197,7 +198,10 @@ function filterToday(on) {
         var toc = document.querySelector('.toc-counts[data-release="' + id + '"]');
         if (toc) toc.textContent = summary;
         var badge = sec.querySelector('.release-badge');
-        if (badge) badge.textContent = total + ' ' + lbl;
+        if (badge) {
+            badge.textContent = total + ' ' + lbl;
+            badge.className = 'badge release-badge ' + (total === 0 ? 'badge-ok' : total >= 5 ? 'badge-critical' : 'badge-issues');
+        }
         var bdb = sec.querySelector('.bd-build');
         var bdt = sec.querySelector('.bd-test');
         var bdi = sec.querySelector('.bd-infra');
@@ -291,6 +295,7 @@ document.querySelectorAll('.bugs-table').forEach(function(table) {
         rows.forEach(function(r) { tbody.appendChild(r); });
     }
     headers.forEach(function(th, colIdx) {
+        if (!th.textContent.trim()) return;
         th.addEventListener('click', function() {
             sortBy(colIdx, !th.classList.contains('sort-asc'));
         });
