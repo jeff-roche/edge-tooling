@@ -15,7 +15,7 @@ runs daily and performs these phases automatically:
 1. **Close duplicate rebase PRs** - closes older rebase PRs superseded by newer ones
 2. **Analysis** - `/microshift-ci:doctor <releases>`
 3. **Bug creation** - `/microshift-ci:create-bugs <releases> --create`
-4. **Close stale bugs** - `/microshift-ci:close-stale-bugs --close` - closes unassigned, unlinked bugs inactive for 10+ days
+4. **Close stale bugs** - `/microshift-ci:close-stale-bugs --close` - closes unassigned, unlinked bugs inactive for more than 10 days
 5. **Fix test bugs dry-run** - `/microshift-ci:fix-test-bugs --open` - reports which bugs are eligible for auto-fix
 6. **Report refresh** - `/microshift-ci:doctor-refresh <releases>` - re-generates the HTML report with new bug links
 7. **Rebase PR restart** - restarts failed rebase bot PR tests

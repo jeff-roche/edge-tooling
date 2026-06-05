@@ -62,7 +62,14 @@ Compute once at the start by running `date +%y%m%d` and substituting into the pa
    Run the full doctor workflow first: /microshift-ci:doctor <releases>
    ```
 
-4. Parse the JSON. Extract the `linked` and `unlinked` arrays. Each entry has: `key`, `summary`, `status`, `assignee`, `updated`.
+4. Parse the JSON. Check the `jira_query_available` field. If it is `false`, report a **warning** and stop:
+
+   ```text
+   Warning: JIRA bug data is unavailable (jira_query_available: false)
+   The doctor run could not query JIRA for open bugs. Skipping stale bug cleanup.
+   ```
+
+5. Extract the `linked` and `unlinked` arrays. Each entry has: `key`, `summary`, `status`, `assignee`, `updated`.
 
 ### Step 2: Filter for Closure Candidates
 
@@ -94,9 +101,7 @@ STALE BUG REPORT (MODE: dry-run|close)
     2. ...
 ```
 
-Write a prose summary to `<WORKDIR>/report-close-stale-bugs.txt` containing the report above followed by a per-bug breakdown listing each unlinked bug, its action (close or skip), and the reason.
-
-If MODE is `dry-run`, stop here.
+If MODE is `dry-run`, write a prose summary to `<WORKDIR>/report-close-stale-bugs.txt` containing the report above followed by a per-bug breakdown listing each unlinked bug, its action (close or skip), and the reason. Then stop here.
 
 ### Step 4: Close Bugs (close mode only)
 
@@ -115,11 +120,11 @@ For each closure candidate:
        issue_key="<KEY>",
        transition_id="<close_transition_id>",
        fields='{"resolution": {"name": "Obsolete"}}',
-       comment="Automatically closed: unassigned, not linked to current CI failures, and inactive for 10+ days."
+       comment="Automatically closed: unassigned, not linked to current CI failures, and inactive for more than 10 days."
    )
    ```
 
-3. **Add the tracking label**: Use `jira_get_issue` to fetch the current labels, append `"microshift-ci-ai-closed"`, and call:
+3. **Add the tracking label**: Use `mcp__jira__jira_get_issue` to fetch the current labels, append `"microshift-ci-ai-closed"`, and call:
 
    ```python
    mcp__jira__jira_update_issue(
@@ -147,7 +152,7 @@ SUMMARY
   Processed: <N> | Closed: <N> | Failed: <N>
 ```
 
-Update `<WORKDIR>/report-close-stale-bugs.txt` with the final action outcomes.
+Write `<WORKDIR>/report-close-stale-bugs.txt` with the full report: the summary from Step 3, the per-bug breakdown, and the final action outcomes above.
 
 ## Examples
 
