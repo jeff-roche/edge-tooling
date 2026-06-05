@@ -154,6 +154,18 @@ SUMMARY
 
 Write `<WORKDIR>/report-close-stale-bugs.txt` with the full report: the summary from Step 3, the per-bug breakdown, and the final action outcomes above.
 
+### Step 5: Write Closed-Bugs JSON (close mode only)
+
+If any bugs were actually closed successfully in Step 4, write `<WORKDIR>/close-stale-bugs/closed-bugs.json`:
+
+```json
+{"closed": ["USHIFT-1234", "USHIFT-5678"]}
+```
+
+Include only keys that were closed successfully (not failed). Do not write this file in dry-run mode or if no bugs were closed.
+
+This file is consumed by `/microshift-ci:doctor-refresh` to exclude closed bugs from the HTML report.
+
 ## Examples
 
 ### Example 1: Dry-Run (Default)
