@@ -75,7 +75,7 @@ cmd_check() {
     local result="{}"
     local key
 
-    IFS=',' read -ra keys <<< "${jira_keys}"
+    IFS=',' read -ra keys <<< "${jira_keys^^}"
     for key in "${keys[@]}"; do
         [[ "${key}" =~ ^[A-Z][A-Z0-9]+-[0-9]+$ ]] || { echo "Error: invalid key: ${key}" >&2; return 1; }
         local prs="[]"
