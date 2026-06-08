@@ -27,7 +27,8 @@ Usage:
 Output:
     ${WORKDIR}/bugs/analyze-ci-bug-candidates-<source>.json  (default mode)
     <output>                                                   (--merge mode, via --output)
-    ${WORKDIR}/bugs/analyze-ci-create-bugs-{<source>|merged}.txt  (--report mode)
+    ${WORKDIR}/bugs/analyze-ci-create-bugs-<source>.txt   (--report mode, per-source)
+    ${WORKDIR}/report-create-bugs-merged.txt               (--report mode, merged)
 """
 
 import json
@@ -850,11 +851,14 @@ def main_report(report_file, candidates_file, workdir):
         tag = release_sources[0]
     else:
         tag = "merged" if len(sources) > 1 else sources[0]
-    filename = f"analyze-ci-create-bugs-{tag}.txt"
-
-    bugs_dir = os.path.join(workdir, "bugs")
-    os.makedirs(bugs_dir, exist_ok=True)
-    output_path = os.path.join(bugs_dir, filename)
+    if tag == "merged":
+        filename = f"report-create-bugs-{tag}.txt"
+        output_path = os.path.join(workdir, filename)
+    else:
+        filename = f"analyze-ci-create-bugs-{tag}.txt"
+        bugs_dir = os.path.join(workdir, "bugs")
+        os.makedirs(bugs_dir, exist_ok=True)
+        output_path = os.path.join(bugs_dir, filename)
     report_with_footer = report + f"\n\nReport saved: {output_path}\n{SEPARATOR}\n"
 
     with open(output_path, "w") as f:

@@ -38,7 +38,7 @@ Compute once at the start by running `date +%y%m%d` and substituting into the pa
 /tmp/microshift-ci-claude-workdir.<YYMMDD>
 ```
 
-Create `<WORKDIR>/fix-test-bugs/` at the start of the skill for intermediate files. The repo clone lives at `<WORKDIR>/microshift/` (shared with other skills).
+The repo clone lives at `<WORKDIR>/microshift/` (shared with other skills).
 
 ## Prerequisites
 
