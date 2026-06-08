@@ -63,7 +63,7 @@ cmd_prepare() {
         release=$(echo "${release}" | xargs)  # trim whitespace
         echo "=== Release ${release} ===" >&2
 
-        local jobs_file="${WORKDIR}/jobs/analyze-ci-release-${release}-jobs.json"
+        local jobs_file="${WORKDIR}/jobs/release-${release}-jobs.json"
 
         echo "  Collecting failed periodic jobs..." >&2
         local raw_json raw_err
@@ -76,7 +76,7 @@ cmd_prepare() {
             rm -f "${raw_err}"
             echo "[]" > "${jobs_file}"
             release_errors["${release}"]="${err_msg:-data collection failed}"
-            echo "${release_errors["${release}"]}" > "${WORKDIR}/jobs/analyze-ci-release-${release}-error.txt"
+            echo "${release_errors["${release}"]}" > "${WORKDIR}/jobs/release-${release}-error.txt"
             continue
         fi
         rm -f "${raw_err}"
@@ -110,8 +110,8 @@ cmd_prepare() {
     if ${do_rebase}; then
         echo "=== Rebase Pull Requests ===" >&2
 
-        local prs_file="${WORKDIR}/jobs/analyze-ci-prs-jobs.json"
-        local prs_status_file="${WORKDIR}/jobs/analyze-ci-prs-status.json"
+        local prs_file="${WORKDIR}/jobs/prs-jobs.json"
+        local prs_status_file="${WORKDIR}/jobs/prs-status.json"
 
         echo "  Collecting rebase PRs..." >&2
         local pr_json pr_err
@@ -125,7 +125,7 @@ cmd_prepare() {
             rm -f "${pr_err}"
             echo "[]" > "${prs_file}"
             echo "[]" > "${prs_status_file}"
-            echo "${prs_error:-rebase PR collection failed}" > "${WORKDIR}/jobs/analyze-ci-prs-error.txt"
+            echo "${prs_error:-rebase PR collection failed}" > "${WORKDIR}/jobs/prs-error.txt"
         else
             rm -f "${pr_err}"
 
@@ -185,7 +185,7 @@ cmd_prepare() {
     local releases_json="[]"
     for release in "${RELEASES[@]}"; do
         release=$(echo "${release}" | xargs)
-        local jobs_file="${WORKDIR}/jobs/analyze-ci-release-${release}-jobs.json"
+        local jobs_file="${WORKDIR}/jobs/release-${release}-jobs.json"
         local count=0
         if [[ -f "${jobs_file}" ]]; then
             count=$(jq 'length' "${jobs_file}")
@@ -207,7 +207,7 @@ cmd_prepare() {
         '{workdir: $w, releases: $rel}')
 
     if ${do_rebase}; then
-        local prs_file="${WORKDIR}/jobs/analyze-ci-prs-jobs.json"
+        local prs_file="${WORKDIR}/jobs/prs-jobs.json"
         local pr_job_count=0
         if [[ -f "${prs_file}" ]]; then
             pr_job_count=$(jq 'length' "${prs_file}")
@@ -265,7 +265,7 @@ cmd_finalize() {
 
     # Aggregate PRs (if job files exist)
     local pr_files
-    pr_files=$(find "${WORKDIR}/jobs" -name 'analyze-ci-prs-job-*.txt' 2>/dev/null | head -1)
+    pr_files=$(find "${WORKDIR}/jobs" -name 'prs-job-*.txt' 2>/dev/null | head -1)
     if [[ -n "${pr_files}" ]]; then
         echo "=== Aggregating PRs ===" >&2
         python3 "${SCRIPT_DIR}/aggregate.py" \

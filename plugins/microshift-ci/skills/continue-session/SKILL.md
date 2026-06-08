@@ -35,8 +35,8 @@ Downloads CI Doctor analysis artifacts (per-job reports, summaries, bug mappings
    - Fetches `started.json` to derive the job date → workdir path
    - Fails if the workdir already exists (prevents clobbering local data)
    - Downloads analysis files into subdirectories preserving the source structure:
-     - `<WORKDIR>/jobs/` — job analysis files (`analyze-ci-release-*`, `analyze-ci-prs-*`)
-     - `<WORKDIR>/bugs/` — bug correlation files (`analyze-ci-bugs-*`, `analyze-ci-bug-candidates-*`)
+     - `<WORKDIR>/jobs/` — job analysis files (`release-*`, `prs-*`)
+     - `<WORKDIR>/bugs/` — bug correlation files (`bugs-*`, `bug-candidates-*`)
      - `<WORKDIR>/` — final reports (HTML report, claude logs)
    - Outputs a JSON summary to stdout
 
@@ -72,7 +72,7 @@ Downloads CI Doctor analysis artifacts (per-job reports, summaries, bug mappings
    - **Read individual job reports** for deeper investigation:
 
      ```text
-     <WORKDIR>/jobs/analyze-ci-release-<VERSION>-job-<N>-<BUILD_ID>.txt
+     <WORKDIR>/jobs/release-<VERSION>-job-<N>-<BUILD_ID>.txt
      ```
 
    - **Re-analyze a specific prow job** (downloads fresh artifacts):

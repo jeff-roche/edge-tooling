@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate an HTML report from analyze-ci JSON files.
+Generate an HTML report from CI analysis JSON files.
 
 Shared across components (MicroShift, LVMS, etc.) via symlinks in each
 plugin's scripts/ directory.
@@ -316,38 +316,38 @@ def discover_files(workdir, releases):
 
     for version in releases:
         entry = {"summary": None, "bugs": None, "jobs": None, "error": None}
-        path = os.path.join(jobs_dir, f"analyze-ci-release-{version}-summary.json")
+        path = os.path.join(jobs_dir, f"release-{version}-summary.json")
         if os.path.exists(path):
             entry["summary"] = path
-        path = os.path.join(bugs_dir, f"analyze-ci-bugs-{version}.json")
+        path = os.path.join(bugs_dir, f"bugs-{version}.json")
         if os.path.exists(path):
             entry["bugs"] = path
-        path = os.path.join(jobs_dir, f"analyze-ci-release-{version}-jobs.json")
+        path = os.path.join(jobs_dir, f"release-{version}-jobs.json")
         if os.path.exists(path):
             entry["jobs"] = path
-        path = os.path.join(jobs_dir, f"analyze-ci-release-{version}-error.txt")
+        path = os.path.join(jobs_dir, f"release-{version}-error.txt")
         if os.path.exists(path):
             with open(path) as f:
                 entry["error"] = f.read().strip()
         result["releases"][version] = entry
 
-    path = os.path.join(jobs_dir, "analyze-ci-prs-summary.json")
+    path = os.path.join(jobs_dir, "prs-summary.json")
     if os.path.exists(path):
         result["prs"]["summary"] = path
 
-    path = os.path.join(jobs_dir, "analyze-ci-prs-status.json")
+    path = os.path.join(jobs_dir, "prs-status.json")
     if os.path.exists(path):
         result["prs"]["status"] = path
 
-    for path in glob_mod.glob(os.path.join(bugs_dir, "analyze-ci-bugs-rebase-release-*.json")):
+    for path in glob_mod.glob(os.path.join(bugs_dir, "bugs-rebase-release-*.json")):
         result["prs"]["bugs"].append(path)
 
-    path = os.path.join(jobs_dir, "analyze-ci-prs-error.txt")
+    path = os.path.join(jobs_dir, "prs-error.txt")
     if os.path.exists(path):
         with open(path) as f:
             result["prs"]["error"] = f.read().strip()
 
-    path = os.path.join(bugs_dir, "analyze-ci-open-bugs.json")
+    path = os.path.join(bugs_dir, "open-bugs.json")
     if os.path.exists(path):
         result["open_bugs"] = path
 
@@ -1367,7 +1367,7 @@ def main():
 
     bugs_dir = os.path.join(workdir, "bugs")
     os.makedirs(bugs_dir, exist_ok=True)
-    bugs_summary_path = os.path.join(bugs_dir, "analyze-ci-bugs-summary.json")
+    bugs_summary_path = os.path.join(bugs_dir, "bugs-summary.json")
     with open(bugs_summary_path, "w") as f:
         json.dump(bugs_tab_data, f, indent=2)
 

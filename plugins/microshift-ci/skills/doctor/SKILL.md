@@ -46,8 +46,8 @@ Compute once at the start by running `date +%y%m%d` and substituting into the pa
    ```
 
 3. The script deterministically:
-   - For each release: fetches failed periodic jobs, downloads artifacts, writes `<WORKDIR>/jobs/analyze-ci-release-<version>-jobs.json`
-   - For rebase PRs: fetches PRs with failures, downloads artifacts, writes `<WORKDIR>/jobs/analyze-ci-prs-jobs.json` and `<WORKDIR>/jobs/analyze-ci-prs-status.json`
+   - For each release: fetches failed periodic jobs, downloads artifacts, writes `<WORKDIR>/jobs/release-<version>-jobs.json`
+   - For rebase PRs: fetches PRs with failures, downloads artifacts, writes `<WORKDIR>/jobs/prs-jobs.json` and `<WORKDIR>/jobs/prs-status.json`
    - Outputs a JSON summary listing all releases, job counts, and file paths
 4. Read the JSON output to know which releases have jobs to analyze and how many
 
@@ -100,7 +100,7 @@ Compute once at the start by running `date +%y%m%d` and substituting into the pa
    Agent: subagent_type=general_purpose, prompt="Analyze this Prow job and save the report:
    1. Run /microshift-ci:prow-job <ARTIFACTS_DIR>
    2. After the analysis completes, save the FULL report output (including the --- STRUCTURED SUMMARY --- block) to:
-      <WORKDIR>/jobs/analyze-ci-release-<RELEASE>-job-<N>-<JOB_ID>.txt
+      <WORKDIR>/jobs/release-<RELEASE>-job-<N>-<JOB_ID>.txt
       Use the Write tool to save the file. The file must contain the complete analysis report."
    ```
 
@@ -110,7 +110,7 @@ Compute once at the start by running `date +%y%m%d` and substituting into the pa
    Agent: subagent_type=general_purpose, prompt="Analyze this Prow job and save the report:
    1. Run /microshift-ci:prow-job <ARTIFACTS_DIR>
    2. After the analysis completes, save the FULL report output (including the --- STRUCTURED SUMMARY --- block) to:
-      <WORKDIR>/jobs/analyze-ci-prs-job-<N>-pr<PR>-<JOB_NAME_SUFFIX>.txt
+      <WORKDIR>/jobs/prs-job-<N>-pr<PR>-<JOB_NAME_SUFFIX>.txt
       Use the Write tool to save the file. The file must contain the complete analysis report."
    ```
 
@@ -133,7 +133,7 @@ Compute once at the start by running `date +%y%m%d` and substituting into the pa
    ```
 
 4. The agent produces:
-   - `<WORKDIR>/bugs/analyze-ci-bugs-<source>.json` for each source (mapping files with open bugs data for the Bugs tab)
+   - `<WORKDIR>/bugs/bugs-<source>.json` for each source (mapping files with open bugs data for the Bugs tab)
    - `<WORKDIR>/report-create-bugs-merged.txt` — merged report covering all releases and rebase sources
 5. When the agent returns, immediately proceed to Step 4 in the same turn. Do NOT stop or end your turn between Step 3 and Step 4.
 

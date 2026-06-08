@@ -16,7 +16,7 @@ Usage:
       - PR number: pr-6396, pr6396
       - Rebase shorthand: rebase-release-4.22
 
-    --merge mode reads multiple analyze-ci-bug-candidates-<source>.json
+    --merge mode reads multiple bug-candidates-<source>.json
     files and merges candidates across sources using fuzzy signature
     matching for cross-release dedup.
 
@@ -25,9 +25,9 @@ Usage:
     text report.
 
 Output:
-    ${WORKDIR}/bugs/analyze-ci-bug-candidates-<source>.json  (default mode)
+    ${WORKDIR}/bugs/bug-candidates-<source>.json  (default mode)
     <output>                                                   (--merge mode, via --output)
-    ${WORKDIR}/bugs/analyze-ci-create-bugs-<source>.txt   (--report mode, per-source)
+    ${WORKDIR}/bugs/create-bugs-<source>.txt   (--report mode, per-source)
     ${WORKDIR}/report-create-bugs-merged.txt               (--report mode, merged)
 """
 
@@ -306,7 +306,7 @@ def find_job_files(workdir, source):
 
     # Release version
     if re.match(r"^(\d+\.\d+|main)$", source):
-        pattern = os.path.join(jobs_dir, f"analyze-ci-release-{source}-job-*.txt")
+        pattern = os.path.join(jobs_dir, f"release-{source}-job-*.txt")
         files = sorted(glob_mod.glob(pattern))
         return files, f"release {source}"
 
@@ -314,7 +314,7 @@ def find_job_files(workdir, source):
     m = re.match(r"^pr-?(\d+)$", source)
     if m:
         pr_num = m.group(1)
-        pattern = os.path.join(jobs_dir, f"analyze-ci-prs-job-*-pr{pr_num}-*.txt")
+        pattern = os.path.join(jobs_dir, f"prs-job-*-pr{pr_num}-*.txt")
         files = sorted(glob_mod.glob(pattern))
         return files, f"PR #{pr_num}"
 
@@ -326,7 +326,7 @@ def find_job_files(workdir, source):
 
         # Find PR numbers for this rebase source from the status file
         rebase_pr_numbers = set()
-        status_file = os.path.join(jobs_dir, "analyze-ci-prs-status.json")
+        status_file = os.path.join(jobs_dir, "prs-status.json")
         if os.path.isfile(status_file):
             with open(status_file, "r") as f:
                 try:
@@ -339,7 +339,7 @@ def find_job_files(workdir, source):
                     if pr_num is not None:
                         rebase_pr_numbers.add(int(pr_num))
 
-        pattern = os.path.join(jobs_dir, "analyze-ci-prs-job-*.txt")
+        pattern = os.path.join(jobs_dir, "prs-job-*.txt")
         all_files = sorted(glob_mod.glob(pattern))
         files = []
         for filepath in all_files:
@@ -435,7 +435,7 @@ def _load_jira_lookup(workdir):
     Bug mapping files live under ${workdir}/bugs/.
     """
     lookup = {}
-    pattern = os.path.join(workdir, "bugs", "analyze-ci-bugs-*.json")
+    pattern = os.path.join(workdir, "bugs", "bugs-*.json")
     for filepath in sorted(glob_mod.glob(pattern)):
         with open(filepath, "r") as f:
             data = json.load(f)
@@ -465,7 +465,7 @@ def merge_candidate_files(filepaths, workdir=None):
     analysis_text) and post-Jira bug mapping files (duplicates, regressions).
 
     When workdir is provided and contains bug mapping files
-    (analyze-ci-bugs-*.json), their Jira data is injected into candidates
+    (bugs-*.json), their Jira data is injected into candidates
     so that _merge_groups_by_jira() can merge groups sharing issue keys.
 
     Returns a dict with sources, total_candidates, and candidates[] where
@@ -855,7 +855,7 @@ def main_report(report_file, candidates_file, workdir):
         filename = f"report-create-bugs-{tag}.txt"
         output_path = os.path.join(workdir, filename)
     else:
-        filename = f"analyze-ci-create-bugs-{tag}.txt"
+        filename = f"create-bugs-{tag}.txt"
         bugs_dir = os.path.join(workdir, "bugs")
         os.makedirs(bugs_dir, exist_ok=True)
         output_path = os.path.join(bugs_dir, filename)
@@ -994,7 +994,7 @@ def main():
 
     bugs_dir = os.path.join(workdir, "bugs")
     os.makedirs(bugs_dir, exist_ok=True)
-    output_path = os.path.join(bugs_dir, f"analyze-ci-bug-candidates-{source}.json")
+    output_path = os.path.join(bugs_dir, f"bug-candidates-{source}.json")
     with open(output_path, "w") as f:
         json.dump(result, f, indent=2)
 
