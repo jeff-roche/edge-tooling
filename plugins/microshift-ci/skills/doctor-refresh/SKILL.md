@@ -48,7 +48,7 @@ Compute once at the start by running `date +%y%m%d` and substituting into the pa
 
 1. Parse `<ARGUMENTS>` into a list of release versions.
 2. Check for rebase PR sources in the workdir by looking for `bugs/bug-candidates-rebase-release-*.json` files. Extract the source identifiers (e.g., `rebase-release-4.22`).
-3. Verify that `<WORKDIR>/bugs/bugs-<source>.json` exists for each release version and each rebase PR source.
+3. Verify that `<WORKDIR>/bugs/bug-matches-<source>.json` exists for each release version and each rebase PR source.
 4. If any mapping files are missing, report which ones are missing and show an error:
 
    ```text

@@ -309,7 +309,7 @@ document.querySelectorAll('.bugs-table').forEach(function(table) {
 # ---------------------------------------------------------------------------
 
 def discover_files(workdir, releases):
-    result = {"releases": {}, "prs": {"summary": None, "status": None, "bugs": [], "error": None}, "open_bugs": None}
+    result = {"releases": {}, "prs": {"summary": None, "status": None, "bugs": [], "error": None}}
 
     jobs_dir = os.path.join(workdir, "jobs")
     bugs_dir = os.path.join(workdir, "bugs")
@@ -319,7 +319,7 @@ def discover_files(workdir, releases):
         path = os.path.join(jobs_dir, f"release-{version}-summary.json")
         if os.path.exists(path):
             entry["summary"] = path
-        path = os.path.join(bugs_dir, f"bugs-{version}.json")
+        path = os.path.join(bugs_dir, f"bug-matches-{version}.json")
         if os.path.exists(path):
             entry["bugs"] = path
         path = os.path.join(jobs_dir, f"release-{version}-jobs.json")
@@ -339,17 +339,13 @@ def discover_files(workdir, releases):
     if os.path.exists(path):
         result["prs"]["status"] = path
 
-    for path in glob_mod.glob(os.path.join(bugs_dir, "bugs-rebase-release-*.json")):
+    for path in glob_mod.glob(os.path.join(bugs_dir, "bug-matches-rebase-release-*.json")):
         result["prs"]["bugs"].append(path)
 
     path = os.path.join(jobs_dir, "prs-error.txt")
     if os.path.exists(path):
         with open(path) as f:
             result["prs"]["error"] = f.read().strip()
-
-    path = os.path.join(bugs_dir, "open-bugs.json")
-    if os.path.exists(path):
-        result["open_bugs"] = path
 
     return result
 
@@ -1294,8 +1290,6 @@ def main():
     else:
         print("  PRs: no data")
 
-    print(f"  Open bugs: {'found' if files['open_bugs'] else 'not available'}")
-
     if not found_any:
         print(f"\nError: no analysis files found in {workdir}", file=sys.stderr)
         sys.exit(1)
@@ -1338,7 +1332,7 @@ def main():
     for path in pr_entry["bugs"]:
         all_bug_candidates.extend(load_bug_candidates(path))
 
-    # Collect open bugs from mapping files (deduplicated), fallback to standalone file
+    # Collect open bugs from mapping files (deduplicated)
     all_open_bugs = []
     seen_open_keys = set()
     bug_file_paths = [files["releases"][v]["bugs"] for v in releases if files["releases"].get(v, {}).get("bugs")]
@@ -1349,10 +1343,7 @@ def main():
                 seen_open_keys.add(bug["key"])
                 all_open_bugs.append(bug)
 
-    if all_open_bugs:
-        open_bugs_data = {"date": datetime.now(timezone.utc).strftime("%Y-%m-%d"), "total": len(all_open_bugs), "issues": all_open_bugs}
-    else:
-        open_bugs_data = load_json(files["open_bugs"])
+    open_bugs_data = {"date": datetime.now(timezone.utc).strftime("%Y-%m-%d"), "total": len(all_open_bugs), "issues": all_open_bugs} if all_open_bugs else None
 
     if ignore_keys:
         print(f"  Ignoring {len(ignore_keys)} closed bug(s): {', '.join(sorted(ignore_keys))}")
@@ -1367,7 +1358,7 @@ def main():
 
     bugs_dir = os.path.join(workdir, "bugs")
     os.makedirs(bugs_dir, exist_ok=True)
-    bugs_summary_path = os.path.join(bugs_dir, "bugs-summary.json")
+    bugs_summary_path = os.path.join(bugs_dir, "bug-matches-summary.json")
     with open(bugs_summary_path, "w") as f:
         json.dump(bugs_tab_data, f, indent=2)
 

@@ -435,7 +435,7 @@ def _load_jira_lookup(workdir):
     Bug mapping files live under ${workdir}/bugs/.
     """
     lookup = {}
-    pattern = os.path.join(workdir, "bugs", "bugs-*.json")
+    pattern = os.path.join(workdir, "bugs", "bug-matches-*.json")
     for filepath in sorted(glob_mod.glob(pattern)):
         with open(filepath, "r") as f:
             data = json.load(f)
@@ -465,7 +465,7 @@ def merge_candidate_files(filepaths, workdir=None):
     analysis_text) and post-Jira bug mapping files (duplicates, regressions).
 
     When workdir is provided and contains bug mapping files
-    (bugs-*.json), their Jira data is injected into candidates
+    (bug-matches-*.json), their Jira data is injected into candidates
     so that _merge_groups_by_jira() can merge groups sharing issue keys.
 
     Returns a dict with sources, total_candidates, and candidates[] where

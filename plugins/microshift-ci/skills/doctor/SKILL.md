@@ -133,7 +133,7 @@ Compute once at the start by running `date +%y%m%d` and substituting into the pa
    ```
 
 4. The agent produces:
-   - `<WORKDIR>/bugs/bugs-<source>.json` for each source (mapping files with open bugs data for the Bugs tab)
+   - `<WORKDIR>/bugs/bug-matches-<source>.json` for each source (mapping files with open bugs data for the Bugs tab)
    - `<WORKDIR>/report-create-bugs-merged.txt` — merged report covering all releases and rebase sources
 5. When the agent returns, immediately proceed to Step 4 in the same turn. Do NOT stop or end your turn between Step 3 and Step 4.
 

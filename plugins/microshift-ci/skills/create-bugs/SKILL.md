@@ -101,7 +101,7 @@ After loading per-source candidates (Step 1), check whether bug mapping files al
 
 **Actions**:
 
-1. For each source in `SOURCES`, check if `<WORKDIR>/bugs/bugs-<source>.json` exists
+1. For each source in `SOURCES`, check if `<WORKDIR>/bugs/bug-matches-<source>.json` exists
 2. If **ALL** files exist:
    a. Read each file and build a lookup map: `error_signature` → `{duplicates, regressions}` (aggregate across all source files)
    b. For each per-source candidate across all sources, look up its `error_signature` in the map
@@ -110,7 +110,7 @@ After loading per-source candidates (Step 1), check whether bug mapping files al
       ```text
       Using cached Jira search results from prior run.
       To force fresh Jira searches, delete the bug mapping files:
-        rm <WORKDIR>/bugs/bugs-*.json
+        rm <WORKDIR>/bugs/bug-matches-*.json
       ```
 
    d. If **ANY** candidate has no match in the cache: discard all cached data and proceed to Step 2 (full Jira search for all candidates — do not mix cached and fresh results)
@@ -190,7 +190,7 @@ mcp__jira__jira_search(
 
 If more than 50 results, paginate with `start_at` until all issues are fetched. For each issue, extract: `key`, `summary`, status name, priority name, assignee display name, `created` and `updated` truncated to date only (first 10 characters).
 
-**After completing all Jira searches**, write machine-readable bug mapping files per source. For each source in `SOURCES`, write `<WORKDIR>/bugs/bugs-<source>.json` using this JSON format:
+**After completing all Jira searches**, write machine-readable bug mapping files per source. For each source in `SOURCES`, write `<WORKDIR>/bugs/bug-matches-<source>.json` using this JSON format:
 
 ```json
 {
@@ -465,13 +465,13 @@ For each candidate where action is "update":
 
 **Precondition**: At least one candidate had action `create` in Step 4. (`update` actions only add a comment and do not require mapping file updates.)
 
-After all bugs are created, update the per-source bug mapping files (`<WORKDIR>/bugs/bugs-<source>.json`) so that newly created bugs are reflected in the JIRA data consumed by the HTML report generator.
+After all bugs are created, update the per-source bug mapping files (`<WORKDIR>/bugs/bug-matches-<source>.json`) so that newly created bugs are reflected in the JIRA data consumed by the HTML report generator.
 
 **Actions**:
 
 1. **Collect new bugs**: Gather all candidates where action was `create`. For each, record the `jira_key`, `error_signature`, and the summary used in creation.
 
-2. **Update each mapping file**: For every `<WORKDIR>/bugs/bugs-<source>.json` file (all sources, not just the current one):
+2. **Update each mapping file**: For every `<WORKDIR>/bugs/bug-matches-<source>.json` file (all sources, not just the current one):
 
    a. **Add to `open_bugs`**: Append each new bug to the `open_bugs` array (skip if the key already exists):
 
@@ -581,7 +581,7 @@ Run the analysis first:
 - Bugs are created in USHIFT with component "MicroShift"; duplicate search covers both USHIFT and OCPBUGS
 - All created bugs are labeled with `microshift-ci-ai-generated` for tracking
 - The STRUCTURED SUMMARY block in job files is required — this is a contract with `/microshift-ci:prow-job`
-- Machine-readable bug mapping files (`bugs/bugs-<source>.json`) are written per source in Step 2 (both dry-run and create modes). They serve two purposes: (1) consumed by `create-report.py` to show JIRA bug links in the HTML report, and (2) consumed by `--merge` in Step 2a for Jira-based deduplication across releases
+- Machine-readable bug mapping files (`bugs/bug-matches-<source>.json`) are written per source in Step 2 (both dry-run and create modes). They serve two purposes: (1) consumed by `create-report.py` to show JIRA bug links in the HTML report, and (2) consumed by `--merge` in Step 2a for Jira-based deduplication across releases
 
 ## Related Skills
 

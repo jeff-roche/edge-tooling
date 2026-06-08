@@ -169,7 +169,7 @@ main() {
         local has_summary=false
         [[ -f "${workdir}/jobs/release-${release}-summary.json" ]] && has_summary=true
         local has_bugs=false
-        [[ -f "${workdir}/bugs/bugs-${release}.json" ]] && has_bugs=true
+        [[ -f "${workdir}/bugs/bug-matches-${release}.json" ]] && has_bugs=true
 
         releases_json=$(echo "${releases_json}" | jq \
             --arg r "${release}" \
