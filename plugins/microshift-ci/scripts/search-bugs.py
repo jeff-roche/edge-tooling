@@ -1021,6 +1021,8 @@ def main_merge(merge_files, output_file, workdir):
         sys.exit(1)
 
     os.makedirs(workdir, exist_ok=True)
+    bugs_dir = os.path.join(workdir, "bugs")
+    os.makedirs(bugs_dir, exist_ok=True)
 
     print(f"Merging {len(merge_files)} candidate files", file=sys.stderr)
     result = merge_candidate_files(merge_files, workdir=workdir)

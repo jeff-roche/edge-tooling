@@ -27,16 +27,16 @@ This command does NOT re-analyze CI jobs. It consumes existing job analysis file
 
 - `<ARGUMENTS>` (required): Source identifier(s), optionally followed by flags
   - `<sources>` (required): One or more comma-separated sources. Each source is one of:
-    - **Release version** (e.g., `4.22`, `main`): Looks for files matching `analyze-ci-release-<release>-job-*.txt`
-    - **PR number** (e.g., `pr-6396` or `pr6396`): Looks for files matching `analyze-ci-prs-job-*-pr<number>-*.txt`
-    - **Rebase PR shorthand** (e.g., `rebase-release-4.22`): Resolves to the corresponding rebase PR by scanning existing `analyze-ci-prs-job-*` files for the matching release version in their content
+    - **Release version** (e.g., `4.22`, `main`): Looks for files matching `jobs/analyze-ci-release-<release>-job-*.txt`
+    - **PR number** (e.g., `pr-6396` or `pr6396`): Looks for files matching `jobs/analyze-ci-prs-job-*-pr<number>-*.txt`
+    - **Rebase PR shorthand** (e.g., `rebase-release-4.22`): Resolves to the corresponding rebase PR by scanning existing `jobs/analyze-ci-prs-job-*` files for the matching release version in their content
   - `--create` (optional): Actually create/update JIRA issues. Without this flag, only a dry-run report is produced. See Step 3 for the auto-decision policy.
 
 ## Prerequisites
 
-- Job analysis files must already exist in `<WORKDIR>`:
-  - For releases: `analyze-ci-release-<release>-job-*.txt` (produced by `/microshift-ci:doctor`)
-  - For PRs: `analyze-ci-prs-job-*-pr<number>-*.txt` (produced by `/microshift-ci:doctor`)
+- Job analysis files must already exist in `<WORKDIR>/jobs/`:
+  - For releases: `jobs/analyze-ci-release-<release>-job-*.txt` (produced by `/microshift-ci:doctor`)
+  - For PRs: `jobs/analyze-ci-prs-job-*-pr<number>-*.txt` (produced by `/microshift-ci:doctor`)
 - Each job file must contain a `--- STRUCTURED SUMMARY ---` block (see below)
 - MCP Jira server must be configured and accessible
 - User must have permissions to create issues in USHIFT
@@ -562,7 +562,7 @@ Creates bugs across all releases, updating existing Jira duplicates and skipping
 ```
 
 ```text
-Error: No job analysis files found at <WORKDIR>/analyze-ci-release-4.19-job-*.txt
+Error: No job analysis files found at <WORKDIR>/jobs/analyze-ci-release-4.19-job-*.txt
 
 Run the analysis first:
   /microshift-ci:doctor 4.19
@@ -572,8 +572,8 @@ Run the analysis first:
 
 - This command does NOT run CI analysis — it only consumes existing analysis files from `<WORKDIR>`
 - Supports two file naming patterns:
-  - Release jobs: `analyze-ci-release-<release>-job-*.txt` (from `/microshift-ci:doctor`)
-  - PR jobs: `analyze-ci-prs-job-*-pr<number>-*.txt` (from `/microshift-ci:doctor`)
+  - Release jobs: `jobs/analyze-ci-release-<release>-job-*.txt` (from `/microshift-ci:doctor`)
+  - PR jobs: `jobs/analyze-ci-prs-job-*-pr<number>-*.txt` (from `/microshift-ci:doctor`)
 - Dry-run is the default to prevent accidental bug creation
 - The `--create` flag enables actual bug creation and updating
 - Candidates are always merged via `search-bugs.py --merge` (even for a single source) to produce a unified output with Jira data injected. Cross-release deduplication uses fuzzy signature matching (token-based Jaccard similarity, 50% threshold)
