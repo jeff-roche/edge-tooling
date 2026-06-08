@@ -87,11 +87,11 @@ cmd_check() {
                 --json url,title 2>/dev/null) || raw_json='[]'
 
             # Post-filter: KEY must appear at start or after whitespace, followed
-            # by ":" or " " to avoid substring matches (e.g. USHIFT-123 matching
-            # USHIFT-1234) while catching multi-key and [release-X.Y] titles.
+            # by a non-alphanumeric character (colon, space, plus, bracket, etc.)
+            # to avoid substring matches (e.g. USHIFT-123 matching USHIFT-1234).
             local filtered
             filtered=$(echo "${raw_json}" | jq --arg key "${key}" --arg state "${state}" \
-                '[.[] | select(.title | test("(^|\\s)" + $key + "[: ]")) | {url, state: $state}]')
+                '[.[] | select(.title | test("(^|\\s)" + $key + "([^A-Za-z0-9]|$)")) | {url, state: $state}]')
 
             prs=$(echo "${prs}" "${filtered}" | jq -s '.[0] + .[1]')
         done
@@ -252,12 +252,28 @@ cmd_submit() {
 
     echo "Safety checks passed (${file_count} file(s), all in allowed directories)" >&2
 
-    # Commit with all keys in the message
-    local commit_msg="${jira_keys}: fix CI test: ${summary}"
+    # Split keys into array, filtering empty entries from leading/trailing/duplicate commas
+    local -a keys_arr=()
+    IFS=',' read -ra _raw_keys <<< "${jira_keys}"
+    for k in "${_raw_keys[@]}"; do
+        k="${k// /}"
+        [[ -n "${k}" ]] && keys_arr+=("${k}")
+    done
+    [[ ${#keys_arr[@]} -eq 0 ]] && { echo "Error: no valid keys in --jira-keys" >&2; return 1; }
+
+    local primary_key="${keys_arr[0]}"
+    local key_count=${#keys_arr[@]}
+
+    # Commit — use compact KEY+N format for multi-key groups
+    local commit_msg
+    if [[ "${key_count}" -eq 1 ]]; then
+        commit_msg="${primary_key}: fix CI test: ${summary}"
+    else
+        commit_msg="${primary_key}+$(( key_count - 1 )): fix CI test: ${summary}"
+    fi
     git commit -m "${commit_msg}"
 
     # Push — branch is named after the primary (first) key
-    local primary_key="${jira_keys%%,*}"
     local branch="${BRANCH_PREFIX}${primary_key}"
     git push -u origin "${branch}"
 
@@ -265,22 +281,14 @@ cmd_submit() {
     local changed_files
     changed_files=$(git diff --name-only HEAD~1 | sed 's/^/- `/' | sed 's/$/ `/')
 
-    # PR title: "KEY1+N: ..." when multiple keys, "KEY1: ..." when single
-    local key_count
-    key_count=$(echo "${jira_keys}" | tr ',' '\n' | wc -l)
-    local pr_title
-    if [[ "${key_count}" -eq 1 ]]; then
-        pr_title="${primary_key}: fix CI test: ${summary}"
-    else
-        local extra=$(( key_count - 1 ))
-        pr_title="${primary_key}+${extra}: fix CI test: ${summary}"
-    fi
+    # PR title matches commit message format
+    local pr_title="${commit_msg}"
 
     # Build JIRA links list for the PR body
     local jira_links=""
-    IFS=',' read -ra keys_arr <<< "${jira_keys}"
     for k in "${keys_arr[@]}"; do
-        jira_links+="- [${k}](https://issues.redhat.com/browse/${k})"$'\n'
+        [[ -n "${jira_links}" ]] && jira_links+=$'\n'
+        jira_links+="- [${k}](https://issues.redhat.com/browse/${k})"
     done
 
     local pr_url
@@ -310,7 +318,9 @@ EOF
 )")
 
     echo "PR created: ${pr_url}" >&2
-    jq -n --arg url "${pr_url}" --arg keys "${jira_keys}" \
+    local keys_csv
+    keys_csv=$(IFS=','; echo "${keys_arr[*]}")
+    jq -n --arg url "${pr_url}" --arg keys "${keys_csv}" \
         '{pr_url: $url, jira_keys: ($keys | split(","))}'
 }
 

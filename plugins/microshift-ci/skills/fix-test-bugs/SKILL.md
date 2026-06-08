@@ -78,7 +78,7 @@ Evaluated in order per **group** (a group is one merged candidate and all its JI
    - If **releases** given (e.g., `4.22,5.0`): filter candidates to those whose `releases` array contains at least one of the specified release versions, AND whose `duplicates` array is non-empty. Each matching candidate = one group; the group's keys are the keys from `duplicates`.
    - If **explicit USHIFT keys**: scan all candidates' `duplicates` arrays to find which candidates contain any of the given keys. Multiple explicit keys mapping to the same candidate form one group. Keys not found in any candidate are an error — report them and stop.
 
-5. For each group, select the **primary key** — the lowest-numbered USHIFT key (by the numeric suffix).
+5. For each group, sort the keys by numeric suffix (ascending) and select the **primary key** — the first (lowest-numbered) USHIFT key. Pass the sorted keys to all `fix-test-bugs.sh` commands so the script's first-key extraction matches.
 
 ### Step 1: Evaluate Eligibility
 

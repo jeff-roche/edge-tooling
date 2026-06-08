@@ -16,7 +16,7 @@ runs daily and performs these phases automatically:
 2. **Analysis** - `/microshift-ci:doctor <releases>`
 3. **Bug creation** - `/microshift-ci:create-bugs <releases> --create`
 4. **Close stale bugs** - `/microshift-ci:close-stale-bugs --close` - closes AI-generated, unassigned, unlinked bugs inactive for more than 10 days
-5. **Fix test bugs dry-run** - `/microshift-ci:fix-test-bugs --open` - reports which bugs are eligible for auto-fix
+5. **Fix test bugs dry-run** - `/microshift-ci:fix-test-bugs <releases>` - reports which bugs are eligible for auto-fix
 6. **Report refresh** - `/microshift-ci:doctor-refresh <releases>` - re-generates the HTML report with new bug links
 7. **Rebase PR restart** - restarts failed rebase bot PR tests
 
@@ -96,27 +96,27 @@ To investigate a specific failure in more detail:
 ### 4. Fix Eligible Bugs
 
 ```text
-/microshift-ci:fix-test-bugs --open
+/microshift-ci:fix-test-bugs <releases>
 ```
 
-Queries JIRA for all unresolved AI-generated bugs (`labels = microshift-ci-ai-generated`),
-evaluates each against eligibility check gates, and reports which bugs can be
-auto-fixed in `test/`, `scripts/`, or `docs/`.
+Loads merged candidates from the create-bugs output, groups related bugs by
+shared root cause, evaluates each group against eligibility gates, and reports
+which groups can be auto-fixed in `test/`, `scripts/`, or `docs/`.
 
 Gates:
 
-1. **No existing PR** - checks JIRA links and GitHub for OPEN/MERGED PRs
+1. **No existing PR** - checks GitHub for OPEN/MERGED PRs matching any key in the group
 2. **In-scope files** - fix target must be in `test/`, `scripts/`, or `docs/`
 3. **Code-fixable** - root cause is a test/script issue, not a product bug
 
 To attempt fixes (opens draft PRs in openshift/microshift):
 
 ```text
-/microshift-ci:fix-test-bugs --open --fix
+/microshift-ci:fix-test-bugs <releases> --fix
 ```
 
 `--fix` attempts all eligible fixes without prompting.
-Each fix gets its own branch and draft PR for independent review.
+Each group gets its own branch and draft PR for independent review.
 
 Can also target specific bugs:
 
