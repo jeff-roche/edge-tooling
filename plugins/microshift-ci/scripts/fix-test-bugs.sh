@@ -12,11 +12,11 @@ set -euo pipefail
 #     - Clones openshift/microshift into DIR/microshift/
 #     - Sets up remotes: upstream = openshift, origin = user fork
 #
-#   fix-test-bugs.sh branch --workdir DIR --jira-key KEY
-#     - Creates branch microshift-ci/fix-test-bugs/KEY from upstream/main
+#   fix-test-bugs.sh branch --workdir DIR --jira-keys KEY1,KEY2,...
+#     - Creates branch microshift-ci/fix-test-bugs/KEY1 from upstream/main
 #
-#   fix-test-bugs.sh submit --workdir DIR --jira-key KEY --summary TEXT
-#     - Safety checks, commit, push, create PR
+#   fix-test-bugs.sh submit --workdir DIR --jira-keys KEY1,KEY2,... --summary TEXT
+#     - Safety checks, commit, push, create PR referencing all keys
 
 ALLOWED_DIRS_RE='^(test|scripts|docs)/'
 BRANCH_PREFIX='microshift-ci/fix-test-bugs/'
@@ -149,30 +149,30 @@ cmd_clone() {
 
 cmd_branch() {
     local workdir=""
-    local jira_key=""
+    local jira_keys=""
 
     while [[ ${#} -gt 0 ]]; do
         case "${1}" in
             --workdir) workdir="${2}"; shift 2 ;;
-            --jira-key) jira_key="${2}"; shift 2 ;;
+            --jira-keys) jira_keys="${2}"; shift 2 ;;
             -*) echo "Unknown option: ${1}" >&2; return 1 ;;
             *) echo "Unknown argument: ${1}" >&2; return 1 ;;
         esac
     done
 
     [[ -z "${workdir}" ]] && { echo "Error: --workdir is required" >&2; return 1; }
-    [[ -z "${jira_key}" ]] && { echo "Error: --jira-key is required" >&2; return 1; }
+    [[ -z "${jira_keys}" ]] && { echo "Error: --jira-keys is required" >&2; return 1; }
 
     local repo_dir="${workdir}/microshift"
     [[ -d "${repo_dir}" ]] || { echo "Error: repo not found at ${repo_dir} — run clone first" >&2; return 1; }
 
     cd "${repo_dir}"
-    # Clean leftover edits from a prior bug's failed fix attempt (before submit ran)
     git checkout -- . 2>/dev/null || true
     git clean -fd 2>/dev/null || true
     git fetch upstream main
 
-    local branch="${BRANCH_PREFIX}${jira_key}"
+    local primary_key="${jira_keys%%,*}"
+    local branch="${BRANCH_PREFIX}${primary_key}"
 
     if git rev-parse --verify "${branch}" >/dev/null 2>&1; then
         echo "Branch ${branch} already exists, deleting for clean retry..." >&2
@@ -199,14 +199,14 @@ revert_changes() {
 
 cmd_submit() {
     local workdir=""
-    local jira_key=""
+    local jira_keys=""
     local summary=""
     local rationale=""
 
     while [[ ${#} -gt 0 ]]; do
         case "${1}" in
             --workdir) workdir="${2}"; shift 2 ;;
-            --jira-key) jira_key="${2}"; shift 2 ;;
+            --jira-keys) jira_keys="${2}"; shift 2 ;;
             --summary) summary="${2}"; shift 2 ;;
             --rationale) rationale="${2}"; shift 2 ;;
             -*) echo "Unknown option: ${1}" >&2; return 1 ;;
@@ -215,7 +215,7 @@ cmd_submit() {
     done
 
     [[ -z "${workdir}" ]] && { echo "Error: --workdir is required" >&2; return 1; }
-    [[ -z "${jira_key}" ]] && { echo "Error: --jira-key is required" >&2; return 1; }
+    [[ -z "${jira_keys}" ]] && { echo "Error: --jira-keys is required" >&2; return 1; }
     [[ -z "${summary}" ]] && { echo "Error: --summary is required" >&2; return 1; }
     [[ -z "${rationale}" ]] && { echo "Error: --rationale is required" >&2; return 1; }
 
@@ -252,26 +252,45 @@ cmd_submit() {
 
     echo "Safety checks passed (${file_count} file(s), all in allowed directories)" >&2
 
-    # Commit
-    local commit_msg="${jira_key}: fix CI test: ${summary}"
+    # Commit with all keys in the message
+    local commit_msg="${jira_keys}: fix CI test: ${summary}"
     git commit -m "${commit_msg}"
 
-    # Push
-    local branch="${BRANCH_PREFIX}${jira_key}"
+    # Push — branch is named after the primary (first) key
+    local primary_key="${jira_keys%%,*}"
+    local branch="${BRANCH_PREFIX}${primary_key}"
     git push -u origin "${branch}"
 
-    # Build PR body — format as markdown list so filenames with spaces are safe
+    # Build PR body
     local changed_files
     changed_files=$(git diff --name-only HEAD~1 | sed 's/^/- `/' | sed 's/$/ `/')
 
-    local pr_title="${jira_key}: fix CI test: ${summary}"
+    # PR title: "KEY1+N: ..." when multiple keys, "KEY1: ..." when single
+    local key_count
+    key_count=$(echo "${jira_keys}" | tr ',' '\n' | wc -l)
+    local pr_title
+    if [[ "${key_count}" -eq 1 ]]; then
+        pr_title="${primary_key}: fix CI test: ${summary}"
+    else
+        local extra=$(( key_count - 1 ))
+        pr_title="${primary_key}+${extra}: fix CI test: ${summary}"
+    fi
+
+    # Build JIRA links list for the PR body
+    local jira_links=""
+    IFS=',' read -ra keys_arr <<< "${jira_keys}"
+    for k in "${keys_arr[@]}"; do
+        jira_links+="- [${k}](https://issues.redhat.com/browse/${k})"$'\n'
+    done
+
     local pr_url
     pr_url=$(gh pr create --repo openshift/microshift --base main --draft \
         --title "${pr_title}" \
         --body "$(cat <<EOF
 ## Summary
 
-Fix for [${jira_key}](https://issues.redhat.com/browse/${jira_key}).
+Fix for the following CI bugs:
+${jira_links}
 *Auto-generated by [/microshift-ci:fix-test-bugs](https://github.com/openshift-eng/edge-tooling)* :robot:
 
 ## Rationale
@@ -286,12 +305,13 @@ ${changed_files}
 
 - [ ] CI passes
 - [ ] Changes are limited to test/scripts/docs
-- [ ] Fix addresses the root cause described in the JIRA bug
+- [ ] Fix addresses the shared root cause described in the JIRA bugs
 EOF
 )")
 
     echo "PR created: ${pr_url}" >&2
-    jq -n --arg url "${pr_url}" --arg key "${jira_key}" '{pr_url: $url, jira_key: $key}'
+    jq -n --arg url "${pr_url}" --arg keys "${jira_keys}" \
+        '{pr_url: $url, jira_keys: ($keys | split(","))}'
 }
 
 # ---------------------------------------------------------------------------
@@ -303,11 +323,10 @@ usage() {
 Usage: $(basename "$0") <command> [options]
 
 Commands:
-  check   --jira-keys KEY1,KEY2,...       Batch check for existing PRs (JSON output)
-  clone   --workdir DIR                   Clone openshift/microshift and set up remotes
-  branch  --workdir DIR --jira-key KEY    Create branch from upstream/main
-  submit  --workdir DIR --jira-key KEY
-          --summary TXT --rationale TXT   Verify, commit, push, and create PR
+  check   --jira-keys KEY1,KEY2,...                      Batch check for existing PRs (JSON output)
+  clone   --workdir DIR                                Clone openshift/microshift and set up remotes
+  branch  --workdir DIR --jira-keys KEY1,KEY2,...       Create branch from upstream/main (named after first key)
+  submit  --workdir DIR --jira-keys KEY1,KEY2,... --summary TXT --rationale TXT  Verify, commit, push, and create PR
 EOF
     exit 1
 }
