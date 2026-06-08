@@ -16,7 +16,7 @@ allowed-tools: Bash, Read, Glob, Grep
 
 ## Description
 
-Downloads CI Doctor analysis artifacts (per-job reports, summaries, bug mappings, HTML report) from a completed prow job into a local workdir. The workdir date is derived from the prow job's start timestamp, matching the layout the doctor skill creates. This lets you pick up where the CI agent left off — inspect reports, re-run aggregation, create bugs, or do further investigation.
+Downloads CI Doctor analysis artifacts (per-job reports, summaries, bug mappings, HTML report) from a completed prow job into a local workdir, preserving the source directory structure. The workdir date is derived from the prow job's start timestamp, matching the layout the doctor skill creates. This lets you pick up where the CI agent left off — inspect reports, re-run aggregation, create bugs, or do further investigation.
 
 ## Arguments
 
@@ -34,7 +34,10 @@ Downloads CI Doctor analysis artifacts (per-job reports, summaries, bug mappings
    - Parses the URL and converts it to a GCS path
    - Fetches `started.json` to derive the job date → workdir path
    - Fails if the workdir already exists (prevents clobbering local data)
-   - Downloads analysis files (`analyze-ci-*`, HTML report, claude logs)
+   - Downloads analysis files into subdirectories preserving the source structure:
+     - `<WORKDIR>/jobs/` — job analysis files (`analyze-ci-release-*`, `analyze-ci-prs-*`)
+     - `<WORKDIR>/bugs/` — bug correlation files (`analyze-ci-bugs-*`, `analyze-ci-bug-candidates-*`)
+     - `<WORKDIR>/` — final reports (HTML report, claude logs)
    - Outputs a JSON summary to stdout
 
 2. Read the JSON summary. It contains:
@@ -69,7 +72,7 @@ Downloads CI Doctor analysis artifacts (per-job reports, summaries, bug mappings
    - **Read individual job reports** for deeper investigation:
 
      ```text
-     <WORKDIR>/analyze-ci-release-<VERSION>-job-<N>-<BUILD_ID>.txt
+     <WORKDIR>/jobs/analyze-ci-release-<VERSION>-job-<N>-<BUILD_ID>.txt
      ```
 
    - **Re-analyze a specific prow job** (downloads fresh artifacts):
@@ -86,5 +89,5 @@ Downloads CI Doctor analysis artifacts (per-job reports, summaries, bug mappings
 ## Notes
 
 - Only analysis files are downloaded — raw prow job artifacts (build logs, SOS reports) are not included. Use `/microshift-ci:prow-job` or `download-jobs.sh` to fetch those for specific jobs.
-- The workdir uses the same layout as the doctor skill (`/tmp/microshift-ci-claude-workdir.<YYMMDD>`), so all doctor scripts (`finalize`, `aggregate.py`, `create-report.py`) work directly on the downloaded data.
+- The workdir uses the same layout as the doctor skill (`/tmp/microshift-ci-claude-workdir.<YYMMDD>`), with job analysis files under `jobs/` and bug correlation files under `bugs/`. All doctor scripts (`finalize`, `aggregate.py`, `create-report.py`) work directly on the downloaded data.
 - If the workdir for the job's date already exists, the script exits with an error. Remove the existing workdir first if you want to replace it with CI data.
