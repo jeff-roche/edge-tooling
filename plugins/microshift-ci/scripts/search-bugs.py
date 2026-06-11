@@ -39,7 +39,7 @@ import glob as glob_mod
 from datetime import datetime, timezone
 
 from classify import classify_breakdown
-from parse import parse_structured_summary as _parse_structured_summary
+from parse import parse_structured_summary
 
 
 # ---------------------------------------------------------------------------
@@ -66,15 +66,6 @@ SIMILARITY_THRESHOLD = 0.50
 # ---------------------------------------------------------------------------
 # Parsing
 # ---------------------------------------------------------------------------
-
-def parse_structured_summary(filepath):
-    """Parse structured summary and attach source path."""
-    summaries = _parse_structured_summary(filepath)
-
-    for s in summaries:
-        s["source_file"] = filepath
-
-    return summaries
 
 
 # ---------------------------------------------------------------------------

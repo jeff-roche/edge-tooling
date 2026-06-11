@@ -56,7 +56,7 @@ Evaluated in order per **group** (a group is one merged candidate and all its JI
 | Gate | Check | Skip Reason |
 |------|-------|-------------|
 | 1. Existing PR | Checked in batch via `fix-test-bugs.sh check` (see Step 1). Run with ALL keys from the group. If ANY key's array is non-empty (open or merged PR), skip the **entire group**. CLOSED (unmerged) PRs do not block. | PR already \<state\>: \<url\> (e.g., "PR already merged: https://...") |
-| 2. In-scope files | Scan the candidate's `error_signature`, `raw_error`, and `root_cause` for file paths in `test/`, `scripts/`, `docs/`. Also resolve bare filenames to their directory (e.g., `el98@rpm-standard1.sh` -> `test/scenarios/`, `configure-pri.sh` -> `scripts/multinode/`). Skip if ALL referenced files are outside the allowed directories. | Fix target outside allowed dirs |
+| 2. In-scope files | Scan the candidate's `error_signature`, `raw_error`, `root_cause`, and `remediation` for file paths in `test/`, `scripts/`, `docs/`. Also resolve bare filenames to their directory (e.g., `el98@rpm-standard1.sh` -> `test/scenarios/`, `configure-pri.sh` -> `scripts/multinode/`). Skip if ALL referenced files are outside the allowed directories. | Fix target outside allowed dirs |
 | 3. Root cause is code-fixable | Use the candidate's `failure_type` and `root_cause`. Skip if `failure_type` is `infrastructure`. Skip if root cause indicates: product bug in MicroShift core (not test/script issue), transient environmental issue, or upstream dependency problem with no local workaround. Pass if root cause points to: test logic, timeout, configuration, assertion, variable resolution, checksum, script error handling, or documentation. | Not code-fixable |
 
 ## Implementation Steps
@@ -92,7 +92,7 @@ Evaluated in order per **group** (a group is one merged candidate and all its JI
 
 Apply Gates 2–3 to remaining groups and record status: `eligible` or `skipped` (with gate and reason).
 
-- **Gate 2**: Scan the candidate's `error_signature`, `raw_error`, and `root_cause` for file paths. Use the union of all referenced files across the group.
+- **Gate 2**: Scan the candidate's `error_signature`, `raw_error`, `root_cause`, and `remediation` for file paths. Use the union of all referenced files across the group.
 - **Gate 3**: Use `failure_type` and `root_cause` from the candidate.
 
 ### Step 2: Present Dry-Run Report
