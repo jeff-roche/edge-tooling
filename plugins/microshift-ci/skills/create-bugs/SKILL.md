@@ -43,21 +43,26 @@ This command does NOT re-analyze CI jobs. It consumes existing job analysis file
 
 ### STRUCTURED SUMMARY Block
 
-Each job analysis file produced by `/microshift-ci:prow-job` must end with a machine-readable block:
+Each job analysis file produced by `/microshift-ci:prow-job` must end with a machine-readable JSON block. The block is a JSON array with one object per independent failure. Each file may contain multiple entries when a job has independent failures across different scenarios.
 
 ```text
 --- STRUCTURED SUMMARY ---
-SEVERITY: <1-5>
-STACK_LAYER: <AWS Infra|External Infrastructure|build phase|deploy phase|test setup phase|Test Configuration|test|teardown>
-STEP_NAME: <the CI step where the error occurred>
-ERROR_SIGNATURE: <concise, unique description of the root cause error>
-ROOT_CAUSE: <one-line description of WHY the failure happened — the underlying mechanism, not the surface symptom>
-RAW_ERROR: <verbatim primary error message from logs — used for deterministic grouping>
-INFRASTRUCTURE_FAILURE: <true|false>
-JOB_URL: <full prow job URL>
-JOB_NAME: <full periodic job name>
-RELEASE: <X.YY>
-FINISHED: <job finish date in YYYY-MM-DD format>
+[
+  {
+    "severity": 3,
+    "stack_layer": "test",
+    "step_name": "openshift-microshift-e2e-metal-tests",
+    "error_signature": "concise, unique description of the root cause error",
+    "root_cause": "one-line description of WHY the failure happened",
+    "raw_error": "verbatim primary error message from logs",
+    "infrastructure_failure": false,
+    "job_url": "full prow job URL",
+    "job_name": "full periodic job name",
+    "release": "4.22",
+    "remediation": "suggested fix or next step",
+    "finished": "2026-06-01"
+  }
+]
 --- END STRUCTURED SUMMARY ---
 ```
 
@@ -88,7 +93,7 @@ Compute once at the start by running `date +%y%m%d` and substituting into the pa
    python3 plugins/microshift-ci/scripts/search-bugs.py <source> --workdir <WORKDIR>
    ```
 
-   Each invocation writes `<WORKDIR>/bugs/bug-candidates-<source>.json` containing parsed and deduplicated bug candidates with pre-computed `keywords`, `test_ids`, `jobs[]`, and `analysis_text`.
+   Each invocation writes `<WORKDIR>/bugs/bug-candidates-<source>.json` containing parsed and deduplicated bug candidates with pre-computed `keywords`, `test_ids`, `jobs[]`, and `remediation`.
 
 **Error Handling**:
 
@@ -330,7 +335,7 @@ For each candidate where the auto-decision is "create":
 
    CI job failures detected across MicroShift releases: <release1>, <release2>, ...
 
-   <concise description derived from the error signature and analysis text>
+   <concise description derived from the error signature, root cause, and remediation>
 
    ## Version-Release number of selected component (if applicable)
 
@@ -349,7 +354,7 @@ For each candidate where the auto-decision is "create":
 
    ````
 
-   <error details extracted from the analysis text — the specific error message and relevant log context>
+   <error details from `raw_error`; use `remediation` for suggested next steps>
 
    ````
 
