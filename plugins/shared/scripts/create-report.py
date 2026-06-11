@@ -150,7 +150,9 @@ CSS = """\
         .bugs-table td { padding: 6px; border-bottom: 1px solid #eee; font-size: 0.9em; vertical-align: middle; }
         .bugs-table tr:hover { background: #f8f9fa; }
         .link-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75em; font-weight: 700; text-transform: uppercase; }
-        .link-badge-unlinked { background: #fff3cd; color: #856404; }"""
+        .link-badge-unlinked { background: #fff3cd; color: #856404; }
+        .index-image-info { background: #e8f4fd; border-left: 3px solid #0366d6; padding: 8px 12px; margin: 8px 0; font-size: 0.9em; }
+        .index-image-info code { background: #f1f1f1; padding: 2px 4px; border-radius: 3px; font-size: 0.9em; }"""
 
 JS = """\
 function showTab(e, name) {
@@ -739,6 +741,66 @@ def _render_investigation(issue):
         lines.append(f'                <div class="analysis-gaps">Evidence gaps: {_e(", ".join(gaps))}</div>')
     return lines
 
+# ---------------------------------------------------------------------------
+# Index image extraction (LVMS-specific)
+# ---------------------------------------------------------------------------
+
+def extract_index_image(workdir, version):
+    """Extract index image info from per-job report files.
+
+    Scans per-job report files for an '## Index Image' section containing
+    Image, Digest, Built, and Source Commit fields.
+    """
+    pattern = os.path.join(workdir, "jobs", f"release-{version}-job-*.txt")
+    for filepath in sorted(glob_mod.glob(pattern)):
+        try:
+            with open(filepath, "r") as f:
+                content = f.read()
+        except IOError:
+            continue
+
+        if "## Index Image" not in content:
+            continue
+
+        info = {}
+        for line in content.split("\n"):
+            line = line.strip()
+            if line.startswith("- **Image:**"):
+                info["image"] = line.split("**Image:**", 1)[1].strip()
+            elif line.startswith("- **Digest:**"):
+                info["digest"] = line.split("**Digest:**", 1)[1].strip()
+            elif line.startswith("- **Built:**"):
+                info["built"] = line.split("**Built:**", 1)[1].strip()
+            elif line.startswith("- **Source Commit:**"):
+                info["commit"] = line.split("**Source Commit:**", 1)[1].strip()
+
+        if info.get("image"):
+            return info
+
+    return None
+
+
+def _render_index_image(index_info):
+    """Render index image info box HTML (LVMS-specific)."""
+    if not index_info:
+        return ""
+    lines = ['            <div class="index-image-info">']
+    if index_info.get("image"):
+        lines.append(f'                <strong>Catalog Index Image:</strong> <code>{_e(index_info["image"])}</code><br>')
+    if index_info.get("digest"):
+        lines.append(f'                <strong>Digest:</strong> <code>{_e(index_info["digest"])}</code><br>')
+    if index_info.get("built"):
+        lines.append(f'                <strong>Built:</strong> {_e(index_info["built"])}<br>')
+    if index_info.get("commit"):
+        commit = index_info["commit"]
+        short = commit[:12] if len(commit) >= 12 else commit
+        lines.append(
+            f'                <strong>Source Commit:</strong> '
+            f'<a href="https://github.com/openshift/lvm-operator/commit/{_e(commit)}" target="_blank">{_e(short)}</a>'
+        )
+    lines.append("            </div>")
+    return "\n".join(lines)
+
 
 # Graph workdir — set by main() before rendering
 _GRAPHS_DIR = None
@@ -884,7 +946,7 @@ def _render_bug_links(bug_match):
 # HTML rendering
 # ---------------------------------------------------------------------------
 
-def render_release_section(version, rdata, bug_candidates):
+def render_release_section(version, rdata, bug_candidates, index_info=None):
     if rdata is None:
         return (
             f'        <div class="release-section" id="release-{_e(version)}">\n'
@@ -919,6 +981,11 @@ def render_release_section(version, rdata, bug_candidates):
     label = "failure" if total == 1 else "failures"
     lines.append(f'                <span class="badge {badge} release-badge" data-release="{_e(version)}">{total} {label}</span>')
     lines.append("            </div>")
+
+    idx_html = _render_index_image(index_info)
+    if idx_html:
+        lines.append(idx_html)
+
     lines.append('            <div class="breakdown">')
     lines.append(f'                <span class="breakdown-item"><strong class="bd-build">{b["build"]}</strong> Build</span>')
     lines.append(f'                <span class="breakdown-item"><strong class="bd-test">{b["test"]}</strong> Test</span>')
@@ -1129,7 +1196,7 @@ def render_pr_section(pr_data, bug_candidates, pr_status, pr_error=None):
     return "\n".join(toc_lines) + "\n\n" + "\n".join(lines)
 
 
-def generate_html(component_title, releases_data, all_bug_candidates, pr_data, pr_status, timestamp, pr_error=None, bugs_tab_data=None):
+def generate_html(component_title, releases_data, all_bug_candidates, pr_data, pr_status, timestamp, pr_error=None, bugs_tab_data=None, index_data=None):
     date_str = timestamp.strftime("%Y-%m-%d")
     time_str = timestamp.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -1188,8 +1255,9 @@ def generate_html(component_title, releases_data, all_bug_candidates, pr_data, p
             toc.append(f'                <li><a href="#release-{_e(version)}">Release {_e(version)}</a> &mdash; no data</li>')
 
     sections = []
+    _idx = index_data or {}
     for version, rdata in releases_data.items():
-        sections.append(render_release_section(version, rdata, all_bug_candidates))
+        sections.append(render_release_section(version, rdata, all_bug_candidates, _idx.get(version)))
 
     pr_section = render_pr_section(pr_data, all_bug_candidates, pr_status, pr_error)
     bugs_section = render_bugs_section(bugs_tab_data) if bugs_tab_data else ""
@@ -1376,6 +1444,11 @@ def main():
         releases_data[version] = rdata
         bug_data[version] = load_bug_candidates(entry["bugs"])
 
+    index_data = {}
+    if component == "lvm-operator":
+        for version in releases:
+            index_data[version] = extract_index_image(workdir, version)
+
     pr_data = load_json(pr_entry["summary"])
     pr_status = load_json(pr_entry["status"])
     pr_error = pr_entry.get("error")
@@ -1425,7 +1498,7 @@ def main():
 
     # Generate HTML
     timestamp = datetime.now(timezone.utc)
-    html_content = generate_html(component_title, releases_data, all_bug_candidates, pr_data, pr_status, timestamp, pr_error, bugs_tab_data)
+    html_content = generate_html(component_title, releases_data, all_bug_candidates, pr_data, pr_status, timestamp, pr_error, bugs_tab_data, index_data)
 
     output_path = os.path.join(workdir, f"report-{component}-ci-doctor.html")
     with open(output_path, "w") as f:

@@ -161,6 +161,29 @@ The user argument is: `<ARGUMENTS>`
 2. You can quickly determine the failed step from the build-log.txt by reading the last `Running step ...` line before the container logs appear.
 3. Check the CatalogSource and operator setup steps (`lvms-catalogsource`, `operatorhub-subscribe-lvm-operator`, `storage-create-lvm-cluster`) early — if any failed, the operator was never fully deployed and all downstream test failures are secondary.
 
+## Index Image Extraction
+
+Before analyzing test failures, extract the LVMS catalog index image from the job artifacts:
+
+1. Read `artifacts/<TEST_NAME>/lvms-catalogsource/build-log.txt`
+2. Look for the line containing `LVM_INDEX_IMAGE is set to` and extract the image reference
+3. If found, run `skopeo inspect --no-tags "docker://<INDEX_IMAGE>"` to get:
+   - Digest (sha256)
+   - Build date (from `org.opencontainers.image.created` or `created` label)
+   - Source commit (from `io.openshift.build.commit.id` or `vcs-ref` label)
+4. Include an `## Index Image` section in your report (before the structured summary) with the format:
+
+```text
+## Index Image
+
+- **Image:** <full image reference>
+- **Digest:** <sha256:...>
+- **Built:** <date>
+- **Source Commit:** <commit hash>
+```
+
+If `skopeo inspect` fails (e.g., image no longer exists), still report the image reference from the build log.
+
 ## Output Template
 
 Use this template for your error analysis reports:
