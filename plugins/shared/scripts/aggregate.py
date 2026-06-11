@@ -22,187 +22,7 @@ import glob as glob_mod
 from datetime import datetime, timezone
 
 from classify import classify_breakdown
-
-
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
-STOP_WORDS = frozenset({
-    "the", "a", "an", "in", "on", "at", "to", "for", "of", "with", "by",
-    "is", "was", "are", "were", "be", "been", "and", "or", "not", "no",
-    "but", "from", "that", "this", "all", "has", "have", "had", "do",
-    "does", "did", "will", "would", "could", "should", "may", "might",
-})
-
-SIMILARITY_THRESHOLD = 0.50
-
-
-# ---------------------------------------------------------------------------
-# Parsing per-job report files
-# ---------------------------------------------------------------------------
-
-def parse_structured_summary(filepath):
-    """Extract the STRUCTURED SUMMARY block from a per-job report file."""
-    with open(filepath, "r") as f:
-        content = f.read()
-
-    m = re.search(
-        r"--- STRUCTURED SUMMARY ---\n(.+?)\n--- END STRUCTURED SUMMARY ---",
-        content, re.DOTALL,
-    )
-    if not m:
-        return None
-
-    data = {}
-    for line in m.group(1).strip().split("\n"):
-        if ":" in line:
-            key, val = line.split(":", 1)
-            data[key.strip()] = val.strip()
-
-    try:
-        severity = int(data.get("SEVERITY", "3"))
-    except ValueError:
-        severity = 3
-
-    return {
-        "severity": severity,
-        "stack_layer": data.get("STACK_LAYER", ""),
-        "step_name": data.get("STEP_NAME", ""),
-        "error_signature": data.get("ERROR_SIGNATURE", ""),
-        "raw_error": data.get("RAW_ERROR", ""),
-        "root_cause": data.get("ROOT_CAUSE", ""),
-        "infrastructure_failure": data.get("INFRASTRUCTURE_FAILURE", "false").lower() == "true",
-        "job_url": data.get("JOB_URL", ""),
-        "job_name": data.get("JOB_NAME", ""),
-        "release": data.get("RELEASE", ""),
-        "finished": data.get("FINISHED", ""),
-    }
-
-
-def parse_prose_fields(filepath):
-    """Extract Error: and Suggested Remediation: from report prose."""
-    with open(filepath, "r") as f:
-        content = f.read()
-
-    prose = content.split("--- STRUCTURED SUMMARY ---")[0]
-
-    error = ""
-    m = re.search(
-        r"^Error:\s*(.+?)(?=\nSuggested Remediation:|\nError Severity:|\nStack Layer:|\nStep Name:|\n\n|\n---|\Z)",
-        prose, re.MULTILINE | re.DOTALL,
-    )
-    if m:
-        error = " ".join(m.group(1).split())
-
-    remediation = ""
-    m = re.search(
-        r"^Suggested Remediation:\s*(.+?)(?=\n\n|\n---|\nError Severity:|\nStack Layer:|\nStep Name:|\Z)",
-        prose, re.MULTILINE | re.DOTALL,
-    )
-    if m:
-        remediation = " ".join(m.group(1).split())
-
-    return error, remediation
-
-
-# ---------------------------------------------------------------------------
-# Grouping
-# ---------------------------------------------------------------------------
-
-def _normalize_step_name(step_name):
-    """Extract the step ref from a fully-qualified Prow step name.
-
-    Prow step names follow the pattern ``<test-variant>-<step-ref>``
-    where the step ref typically starts with a known prefix such as
-    ``openshift-microshift-``.  The LLM sometimes includes the
-    test-variant prefix, sometimes not, which would cause identical
-    steps to land in different buckets during two-pass grouping.
-
-    The regex harmlessly falls through for components that don't match
-    the MicroShift pattern — the original step_name is returned as-is.
-    """
-    m = re.search(r"(openshift-microshift-\S+)", step_name)
-    return m.group(1) if m else step_name
-
-
-def _tokenize(text):
-    words = re.findall(r"[a-z0-9][a-z0-9_.-]*[a-z0-9]|[a-z0-9]", text.lower())
-    return {w for w in words if w not in STOP_WORDS and len(w) >= 2}
-
-
-def signature_similarity(sig_a, sig_b):
-    tokens_a = _tokenize(sig_a)
-    tokens_b = _tokenize(sig_b)
-    if not tokens_a or not tokens_b:
-        return 0.0
-    return len(tokens_a & tokens_b) / min(len(tokens_a), len(tokens_b))
-
-
-def _grouping_text(job):
-    """Return the text used for similarity grouping.
-
-    Prefers RAW_ERROR (verbatim log text, deterministic) over
-    ERROR_SIGNATURE (LLM-paraphrased, variable across runs).
-    Appends ROOT_CAUSE when present to improve cross-release matching
-    for failures that share the same underlying mechanism.
-    """
-    base = job.get("raw_error") or job.get("error_signature", "")
-    root_cause = job.get("root_cause", "")
-    if root_cause:
-        return base + " " + root_cause
-    return base
-
-
-def _group_by_similarity(jobs):
-    """Group jobs by similarity of their grouping text.
-
-    Uses RAW_ERROR when available (deterministic log text),
-    falling back to ERROR_SIGNATURE for older reports.
-
-    A new job is compared against ALL existing members of each group,
-    not just the first.  If any member exceeds the similarity threshold
-    the job joins that group.  This makes grouping less sensitive to
-    insertion order and to phrasing variation — each member added to
-    a group acts as an additional reference point for future matches.
-    """
-    groups = []
-    for job in jobs:
-        sig = _grouping_text(job)
-        placed = False
-        for group in groups:
-            if any(
-                signature_similarity(sig, _grouping_text(member)) >= SIMILARITY_THRESHOLD
-                for member in group
-            ):
-                group.append(job)
-                placed = True
-                break
-        if not placed:
-            groups.append([job])
-    return groups
-
-
-def group_by_signature(jobs):
-    """Two-pass grouping: first by step_name, then by signature similarity.
-
-    Grouping by step_name first prevents jobs from different CI steps
-    (e.g. conformance vs metal-tests) from being merged together even
-    when their error signatures share enough tokens to exceed the
-    similarity threshold.  This makes the issue count deterministic
-    across runs where only the signature wording varies.
-    """
-    # Pass 1: bucket by normalized step_name
-    by_step = {}
-    for job in jobs:
-        step = _normalize_step_name(job.get("step_name", ""))
-        by_step.setdefault(step, []).append(job)
-
-    # Pass 2: within each step bucket, group by signature similarity
-    all_groups = []
-    for step_jobs in by_step.values():
-        all_groups.extend(_group_by_similarity(step_jobs))
-    return all_groups
+from parse import parse_structured_summary, group_by_signature
 
 
 def classify_severity(group):
@@ -265,8 +85,8 @@ def _build_issues_from_jobs(jobs):
             "job_count": len(group),
             "severity": classify_severity(group),
             "failure_type": failure_type,
-            "root_cause": rep.get("root_cause") or rep.get("error_text", ""),
-            "next_steps": rep.get("remediation_text", ""),
+            "root_cause": rep.get("root_cause", ""),
+            "next_steps": rep.get("remediation", ""),
             "affected_jobs": [
                 {"name": j["job_name"], "date": j["finished"], "url": j["job_url"]}
                 for j in group
@@ -389,14 +209,11 @@ def main():
         print(f"Found {len(files)} job files for release {release}", file=sys.stderr)
         jobs = []
         for filepath in files:
-            summary = parse_structured_summary(filepath)
-            if summary is None:
+            summaries = parse_structured_summary(filepath)
+            if not summaries:
                 print(f"  WARNING: no STRUCTURED SUMMARY in {os.path.basename(filepath)}", file=sys.stderr)
                 continue
-            error_text, remediation_text = parse_prose_fields(filepath)
-            summary["error_text"] = error_text
-            summary["remediation_text"] = remediation_text
-            jobs.append(summary)
+            jobs.extend(summaries)
 
         if not jobs:
             print("No valid job reports found", file=sys.stderr)
@@ -420,19 +237,17 @@ def main():
             print(f"Found {len(files)} PR job files", file=sys.stderr)
             pr_jobs = {}
             for filepath in files:
-                summary = parse_structured_summary(filepath)
-                if summary is None:
+                summaries = parse_structured_summary(filepath)
+                if not summaries:
                     print(f"  WARNING: no STRUCTURED SUMMARY in {os.path.basename(filepath)}", file=sys.stderr)
                     continue
-                error_text, remediation_text = parse_prose_fields(filepath)
-                summary["error_text"] = error_text
-                summary["remediation_text"] = remediation_text
-                summary["pr_title"] = ""
-                summary["pr_url"] = ""
+                for summary in summaries:
+                    summary["pr_title"] = ""
+                    summary["pr_url"] = ""
 
                 m = re.search(r"-pr(\d+)-", os.path.basename(filepath))
                 pr_number = int(m.group(1)) if m else 0
-                pr_jobs.setdefault(pr_number, []).append(summary)
+                pr_jobs.setdefault(pr_number, []).extend(summaries)
 
             result = build_pr_json(pr_jobs, timestamp)
 

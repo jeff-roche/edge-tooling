@@ -39,179 +39,22 @@ import glob as glob_mod
 from datetime import datetime, timezone
 
 from classify import classify_breakdown
-
-
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
-STOP_WORDS = frozenset({
-    "the", "a", "an", "in", "on", "at", "to", "for", "of", "with", "by",
-    "is", "was", "are", "were", "be", "been", "and", "or", "not", "no",
-    "but", "from", "that", "this", "all", "has", "have", "had", "do",
-    "does", "did", "will", "would", "could", "should", "may", "might",
-})
+from parse import (
+    STOP_WORDS, normalize_step_name, cluster_by_similarity,
+    group_by_signature, grouping_text, parse_structured_summary, tokenize,
+)
 
 # Additional stop words filtered only during keyword extraction for Jira search,
-# not during signature grouping (which must match aggregate.py's tokenization).
+# not during signature grouping (which uses the shared STOP_WORDS).
 KEYWORD_STOP_WORDS = STOP_WORDS | frozenset({
     "ci", "microshift", "failure", "failed", "error", "test", "tests",
     "job", "jobs", "step", "periodic",
 })
 
-SIMILARITY_THRESHOLD = 0.50
-
-
-# ---------------------------------------------------------------------------
-# Parsing
-# ---------------------------------------------------------------------------
-
-def parse_structured_summary(filepath):
-    """Extract STRUCTURED SUMMARY block from a per-job report file."""
-    with open(filepath, "r") as f:
-        content = f.read()
-
-    m = re.search(
-        r"--- STRUCTURED SUMMARY ---\n(.+?)\n--- END STRUCTURED SUMMARY ---",
-        content, re.DOTALL,
-    )
-    if not m:
-        return None
-
-    data = {}
-    for line in m.group(1).strip().split("\n"):
-        if ":" in line:
-            key, val = line.split(":", 1)
-            data[key.strip()] = val.strip()
-
-    try:
-        severity = int(data.get("SEVERITY", "3"))
-    except ValueError:
-        severity = 3
-
-    # Get the analysis text (everything before STRUCTURED SUMMARY)
-    analysis_text = content.split("--- STRUCTURED SUMMARY ---")[0].strip()
-
-    return {
-        "severity": severity,
-        "stack_layer": data.get("STACK_LAYER", ""),
-        "step_name": data.get("STEP_NAME", ""),
-        "error_signature": data.get("ERROR_SIGNATURE", ""),
-        "raw_error": data.get("RAW_ERROR", ""),
-        "root_cause": data.get("ROOT_CAUSE", ""),
-        "infrastructure_failure": data.get("INFRASTRUCTURE_FAILURE", "false").lower() == "true",
-        "job_url": data.get("JOB_URL", ""),
-        "job_name": data.get("JOB_NAME", ""),
-        "release": data.get("RELEASE", ""),
-        "finished": data.get("FINISHED", ""),
-        "analysis_text": analysis_text,
-        "source_file": filepath,
-    }
-
-
-# ---------------------------------------------------------------------------
-# Grouping
-# ---------------------------------------------------------------------------
-
-def _normalize_step_name(step_name):
-    """Extract the step ref from a fully-qualified Prow step name.
-
-    Prow step names follow ``<test-variant>-<step-ref>`` where the
-    step ref typically starts with ``openshift-microshift-``.
-    """
-    m = re.search(r"(openshift-microshift-\S+)", step_name)
-    return m.group(1) if m else step_name
-
-
-def _tokenize(text):
-    words = re.findall(r"[a-z0-9][a-z0-9_.-]*[a-z0-9]|[a-z0-9]", text.lower())
-    return {w for w in words if w not in STOP_WORDS and len(w) >= 2}
-
-
-def _signature_similarity(sig_a, sig_b):
-    tokens_a = _tokenize(sig_a)
-    tokens_b = _tokenize(sig_b)
-    if not tokens_a or not tokens_b:
-        return 0.0
-    return len(tokens_a & tokens_b) / min(len(tokens_a), len(tokens_b))
-
-
-def _grouping_text(job):
-    """Return the text used for similarity grouping.
-
-    Prefers RAW_ERROR (verbatim log text, deterministic) over
-    ERROR_SIGNATURE (LLM-paraphrased, variable across runs).
-    Appends ROOT_CAUSE when present to improve cross-release matching
-    for failures that share the same underlying mechanism.
-    """
-    base = job.get("raw_error") or job.get("error_signature", "")
-    root_cause = job.get("root_cause", "")
-    if root_cause:
-        return base + " " + root_cause
-    return base
-
-
-def _cluster_by_similarity(items, key_fn):
-    """Cluster items whose key texts exceed the similarity threshold.
-
-    A new item is compared against ALL existing members of each cluster.
-    If any member exceeds the threshold the item joins that cluster.
-    """
-    groups = []
-    for item in items:
-        sig = key_fn(item)
-        placed = False
-        for group in groups:
-            if any(
-                _signature_similarity(sig, key_fn(member)) >= SIMILARITY_THRESHOLD
-                for member in group
-            ):
-                group.append(item)
-                placed = True
-                break
-        if not placed:
-            groups.append([item])
-    return groups
-
-
-def _group_by_similarity(jobs):
-    """Group jobs by similarity of their grouping text.
-
-    Uses RAW_ERROR when available (deterministic log text),
-    falling back to ERROR_SIGNATURE for older reports.
-    """
-    return _cluster_by_similarity(jobs, _grouping_text)
-
-
-def group_by_signature(jobs):
-    """Two-pass grouping: first by step_name, then by signature similarity.
-
-    Grouping by step_name first prevents jobs from different CI steps
-    from being merged together even when their error signatures share
-    enough tokens to exceed the similarity threshold.
-    """
-    # Pass 1: bucket by normalized step_name
-    by_step = {}
-    for job in jobs:
-        step = _normalize_step_name(job.get("step_name", ""))
-        by_step.setdefault(step, []).append(job)
-
-    # Pass 2: within each step bucket, group by signature similarity
-    all_groups = []
-    for step_jobs in by_step.values():
-        all_groups.extend(_group_by_similarity(step_jobs))
-    return all_groups
-
 
 # ---------------------------------------------------------------------------
 # Keyword extraction
 # ---------------------------------------------------------------------------
-
-def _tokenize_for_keywords(text):
-    """Tokenize with extra stop words filtered for Jira keyword extraction."""
-    words = re.findall(r"[a-z0-9][a-z0-9_.-]*[a-z0-9]|[a-z0-9]", text.lower())
-    return {w for w in words if w not in KEYWORD_STOP_WORDS and len(w) >= 2}
-
 
 def extract_keywords(error_signature):
     """Extract distinctive search keywords from an error signature.
@@ -220,7 +63,7 @@ def extract_keywords(error_signature):
     Uses KEYWORD_STOP_WORDS (broader filtering) so generic CI terms
     like "test", "failed", "microshift" don't pollute Jira searches.
     """
-    tokens = _tokenize_for_keywords(error_signature)
+    tokens = tokenize(error_signature, KEYWORD_STOP_WORDS)
     if not tokens:
         return []
 
@@ -259,6 +102,8 @@ def build_candidates(groups):
         entry = {
             "error_signature": rep["error_signature"],
             "root_cause": rep.get("root_cause", ""),
+            "raw_error": rep.get("raw_error", ""),
+            "remediation": rep.get("remediation", ""),
             "severity": max(j["severity"] for j in group),
             "failure_type": classify_breakdown(
                 rep["stack_layer"],
@@ -278,7 +123,6 @@ def build_candidates(groups):
                 }
                 for j in group
             ],
-            "analysis_text": rep["analysis_text"],
         }
 
         other_sigs = sorted({j["error_signature"] for j in group} - {rep["error_signature"]})
@@ -350,10 +194,11 @@ def find_job_files(workdir, source):
                 continue
 
             # Fallback: match by structured summary fields
-            summary = parse_structured_summary(filepath)
-            if summary and (
-                f"release-{release}" in summary.get("job_name", "")
-                or summary.get("release", "") == release
+            summaries = parse_structured_summary(filepath)
+            if summaries and any(
+                f"release-{release}" in s.get("job_name", "")
+                or s.get("release", "") == release
+                for s in summaries
             ):
                 files.append(filepath)
 
@@ -365,16 +210,6 @@ def find_job_files(workdir, source):
 # ---------------------------------------------------------------------------
 # Cross-release merge
 # ---------------------------------------------------------------------------
-
-def _merge_by_similarity(candidates):
-    """Group candidates by error_signature + root_cause similarity for cross-release dedup."""
-    def _merge_key(c):
-        base = c.get("error_signature", "")
-        root_cause = c.get("root_cause", "")
-        if root_cause:
-            return base + " " + root_cause
-        return base
-    return _cluster_by_similarity(candidates, _merge_key)
 
 
 def _jira_keys(candidate):
@@ -461,8 +296,8 @@ def _load_jira_lookup(workdir):
 def merge_candidate_files(filepaths, workdir=None):
     """Merge multiple candidate JSON files with fuzzy dedup and Jira-based dedup.
 
-    Handles both pre-Jira candidate files (keywords, test_ids, jobs,
-    analysis_text) and post-Jira bug mapping files (duplicates, regressions).
+    Handles both pre-Jira candidate files (keywords, test_ids, jobs)
+    and post-Jira bug mapping files (duplicates, regressions).
 
     When workdir is provided and contains bug mapping files
     (bug-matches-*.json), their Jira data is injected into candidates
@@ -503,12 +338,12 @@ def merge_candidate_files(filepaths, workdir=None):
     # Pass 1: bucket by normalized step_name, then fuzzy-match within each bucket
     by_step = {}
     for cand in all_candidates:
-        step = _normalize_step_name(cand.get("step_name", ""))
+        step = normalize_step_name(cand.get("step_name", ""))
         by_step.setdefault(step, []).append(cand)
 
     merged_groups = []
     for step_cands in by_step.values():
-        merged_groups.extend(_merge_by_similarity(step_cands))
+        merged_groups.extend(cluster_by_similarity(step_cands, grouping_text))
 
     n_groups_before_jira = len(merged_groups)
 
@@ -563,6 +398,8 @@ def merge_candidate_files(filepaths, workdir=None):
         entry = {
             "error_signature": rep["error_signature"],
             "root_cause": rep.get("root_cause", ""),
+            "raw_error": rep.get("raw_error", ""),
+            "remediation": rep.get("remediation", ""),
             "severity": max(c["severity"] for c in group),
             "failure_type": rep.get("failure_type", "test"),
             "step_name": ", ".join(step_names) if step_names else rep.get("step_name", ""),
@@ -570,7 +407,6 @@ def merge_candidate_files(filepaths, workdir=None):
             "keywords": sorted(all_keywords),
             "test_ids": sorted(all_test_ids),
             "jobs": all_jobs,
-            "analysis_text": rep.get("analysis_text", ""),
             "releases": releases,
         }
         if other_sigs:
@@ -962,12 +798,12 @@ def main():
     jobs = []
     skipped = 0
     for filepath in files:
-        summary = parse_structured_summary(filepath)
-        if summary is None:
+        summaries = parse_structured_summary(filepath)
+        if not summaries:
             print(f"  WARNING: no STRUCTURED SUMMARY in {os.path.basename(filepath)}", file=sys.stderr)
             skipped += 1
             continue
-        jobs.append(summary)
+        jobs.extend(summaries)
 
     if not jobs:
         print("No valid job reports found", file=sys.stderr)

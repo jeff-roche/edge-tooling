@@ -19,7 +19,7 @@ allowed-tools: Bash, Read, Write, Glob, Grep, Agent, mcp__jira__jira_search, mcp
 
 Reads individual job analysis reports produced by `microshift-ci:doctor` and creates JIRA bugs in USHIFT for CI test failures. Operates in **dry-run mode by default** - it shows what bugs would be created without actually creating them. Use `--create` to perform actual issue creation.
 
-Candidates are always **fuzzy-matched across sources** using token-based Jaccard similarity (50% threshold) with step-name bucketing — the same root cause appearing in multiple releases becomes a single candidate and a single Jira bug referencing all affected releases.
+Candidates are always **fuzzy-matched across sources** using token-based overlap similarity (50% threshold) with step-name bucketing — the same root cause appearing in multiple releases becomes a single candidate and a single Jira bug referencing all affected releases.
 
 This command does NOT re-analyze CI jobs. It consumes existing job analysis files from `<WORKDIR>`.
 
@@ -43,21 +43,26 @@ This command does NOT re-analyze CI jobs. It consumes existing job analysis file
 
 ### STRUCTURED SUMMARY Block
 
-Each job analysis file produced by `/microshift-ci:prow-job` must end with a machine-readable block:
+Each job analysis file produced by `/microshift-ci:prow-job` must end with a machine-readable JSON block. The block is a JSON array with one object per independent failure. Each file may contain multiple entries when a job has independent failures across different scenarios.
 
 ```text
 --- STRUCTURED SUMMARY ---
-SEVERITY: <1-5>
-STACK_LAYER: <AWS Infra|External Infrastructure|build phase|deploy phase|test setup phase|Test Configuration|test|teardown>
-STEP_NAME: <the CI step where the error occurred>
-ERROR_SIGNATURE: <concise, unique description of the root cause error>
-ROOT_CAUSE: <one-line description of WHY the failure happened — the underlying mechanism, not the surface symptom>
-RAW_ERROR: <verbatim primary error message from logs — used for deterministic grouping>
-INFRASTRUCTURE_FAILURE: <true|false>
-JOB_URL: <full prow job URL>
-JOB_NAME: <full periodic job name>
-RELEASE: <X.YY>
-FINISHED: <job finish date in YYYY-MM-DD format>
+[
+  {
+    "severity": 3,
+    "stack_layer": "test",
+    "step_name": "openshift-microshift-e2e-metal-tests",
+    "error_signature": "concise, unique description of the root cause error",
+    "root_cause": "one-line description of WHY the failure happened",
+    "raw_error": "verbatim primary error message from logs",
+    "infrastructure_failure": false,
+    "job_url": "full prow job URL",
+    "job_name": "full periodic job name",
+    "release": "4.22",
+    "remediation": "suggested fix or next step",
+    "finished": "2026-06-01"
+  }
+]
 --- END STRUCTURED SUMMARY ---
 ```
 
@@ -88,7 +93,7 @@ Compute once at the start by running `date +%y%m%d` and substituting into the pa
    python3 plugins/microshift-ci/scripts/search-bugs.py <source> --workdir <WORKDIR>
    ```
 
-   Each invocation writes `<WORKDIR>/bugs/bug-candidates-<source>.json` containing parsed and deduplicated bug candidates with pre-computed `keywords`, `test_ids`, `jobs[]`, and `analysis_text`.
+   Each invocation writes `<WORKDIR>/bugs/bug-candidates-<source>.json` containing parsed and deduplicated bug candidates with pre-computed `keywords`, `test_ids`, `jobs[]`, and `remediation`.
 
 **Error Handling**:
 
@@ -175,7 +180,7 @@ After completing ALL searches for a candidate:
 
 1. **`duplicates` array**: Must contain ALL unique open bugs returned by searches A and B (deduplicated by key). Do NOT stop at the first match — record every issue returned.
 2. **`regressions` array**: Must contain ALL unique closed/verified bugs returned by Search C (deduplicated by key). An empty `regressions` array means Search C returned zero results — not that it was skipped.
-3. Do NOT filter either array for relevance — downstream scripts use Jaccard similarity to match bugs to failures.
+3. Do NOT filter either array for relevance — downstream scripts use overlap similarity to match bugs to failures.
 4. Extract `key`, `summary`, `status`, `assignee` (display name), and `updated` (YYYY-MM-DD) directly from the search results — `jira_search` returns these fields by default. Do NOT call `jira_get_issue` for each entry.
 
 **Query for open AI-generated bugs**: After completing all per-candidate searches, run one additional query to fetch all open bugs with the `microshift-ci-ai-generated` label:
@@ -330,7 +335,7 @@ For each candidate where the auto-decision is "create":
 
    CI job failures detected across MicroShift releases: <release1>, <release2>, ...
 
-   <concise description derived from the error signature and analysis text>
+   <concise description derived from the error signature, root cause, and remediation>
 
    ## Version-Release number of selected component (if applicable)
 
@@ -349,7 +354,7 @@ For each candidate where the auto-decision is "create":
 
    ````
 
-   <error details extracted from the analysis text — the specific error message and relevant log context>
+   <error details from `raw_error`; use `remediation` for suggested next steps>
 
    ````
 
@@ -576,7 +581,7 @@ Run the analysis first:
   - PR jobs: `jobs/prs-job-*-pr<number>-*.txt` (from `/microshift-ci:doctor`)
 - Dry-run is the default to prevent accidental bug creation
 - The `--create` flag enables actual bug creation and updating
-- Candidates are always merged via `search-bugs.py --merge` (even for a single source) to produce a unified output with Jira data injected. Cross-release deduplication uses fuzzy signature matching (token-based Jaccard similarity, 50% threshold)
+- Candidates are always merged via `search-bugs.py --merge` (even for a single source) to produce a unified output with Jira data injected. Cross-release deduplication uses fuzzy signature matching (token-based overlap similarity, 50% threshold)
 - Infrastructure failures (`failure_type: "infrastructure"`) are automatically skipped — these are transient CI/cloud issues, not product bugs. Classification uses the same step-name-based logic as the HTML report (`classify_breakdown` in `classify.py`)
 - Bugs are created in USHIFT with component "MicroShift"; duplicate search covers both USHIFT and OCPBUGS
 - All created bugs are labeled with `microshift-ci-ai-generated` for tracking
