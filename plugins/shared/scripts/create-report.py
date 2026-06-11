@@ -1445,9 +1445,8 @@ def main():
         bug_data[version] = load_bug_candidates(entry["bugs"])
 
     index_data = {}
-    if component == "lvm-operator":
-        for version in releases:
-            index_data[version] = extract_index_image(workdir, version)
+    for version in releases:
+        index_data[version] = extract_index_image(workdir, version)
 
     pr_data = load_json(pr_entry["summary"])
     pr_status = load_json(pr_entry["status"])
