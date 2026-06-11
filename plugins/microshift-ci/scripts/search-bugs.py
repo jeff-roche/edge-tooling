@@ -227,6 +227,8 @@ def build_candidates(groups):
         entry = {
             "error_signature": rep["error_signature"],
             "root_cause": rep.get("root_cause", ""),
+            "raw_error": rep.get("raw_error", ""),
+            "remediation": rep.get("remediation", ""),
             "severity": max(j["severity"] for j in group),
             "failure_type": classify_breakdown(
                 rep["stack_layer"],
@@ -531,6 +533,8 @@ def merge_candidate_files(filepaths, workdir=None):
         entry = {
             "error_signature": rep["error_signature"],
             "root_cause": rep.get("root_cause", ""),
+            "raw_error": rep.get("raw_error", ""),
+            "remediation": rep.get("remediation", ""),
             "severity": max(c["severity"] for c in group),
             "failure_type": rep.get("failure_type", "test"),
             "step_name": ", ".join(step_names) if step_names else rep.get("step_name", ""),
