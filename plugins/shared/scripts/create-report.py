@@ -746,38 +746,14 @@ def _render_investigation(issue):
 # ---------------------------------------------------------------------------
 
 def extract_index_image(workdir, version):
-    """Extract index image info from per-job report files.
+    """Load index image info from the index-image subdirectory.
 
-    Scans per-job report files for an '## Index Image' section containing
-    Image, Digest, Built, and Source Commit fields.
+    Reads ${WORKDIR}/index-image/release-<version>.json produced by
+    extract-index-image.sh. Returns None when the file does not exist
+    (non-LVMS component or script has not run).
     """
-    pattern = os.path.join(workdir, "jobs", f"release-{version}-job-*.txt")
-    for filepath in sorted(glob_mod.glob(pattern)):
-        try:
-            with open(filepath, "r") as f:
-                content = f.read()
-        except IOError:
-            continue
-
-        if "## Index Image" not in content:
-            continue
-
-        info = {}
-        for line in content.split("\n"):
-            line = line.strip()
-            if line.startswith("- **Image:**"):
-                info["image"] = line.split("**Image:**", 1)[1].strip()
-            elif line.startswith("- **Digest:**"):
-                info["digest"] = line.split("**Digest:**", 1)[1].strip()
-            elif line.startswith("- **Built:**"):
-                info["built"] = line.split("**Built:**", 1)[1].strip()
-            elif line.startswith("- **Source Commit:**"):
-                info["commit"] = line.split("**Source Commit:**", 1)[1].strip()
-
-        if info.get("image"):
-            return info
-
-    return None
+    path = os.path.join(workdir, "index-image", f"release-{version}.json")
+    return load_json(path)
 
 
 def _render_index_image(index_info):
@@ -798,6 +774,8 @@ def _render_index_image(index_info):
             f'                <strong>Source Commit:</strong> '
             f'<a href="https://github.com/openshift/lvm-operator/commit/{_e(commit)}" target="_blank">{_e(short)}</a>'
         )
+    if index_info.get("error"):
+        lines.append(f'                <br><em style="color:#856404;">Inspect failed: {_e(index_info["error"])}</em>')
     lines.append("            </div>")
     return "\n".join(lines)
 
