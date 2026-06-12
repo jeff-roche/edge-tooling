@@ -27,7 +27,7 @@ WORKDIR=""
 extract_image_ref() {
     local build_log="$1"
     grep -m1 'LVM_INDEX_IMAGE is set to' "${build_log}" 2>/dev/null \
-        | sed 's/.*LVM_INDEX_IMAGE is set to //' \
+        | sed 's/.*LVM_INDEX_IMAGE is set to[: ]*//' \
         | tr -d '[:space:]'
 }
 
