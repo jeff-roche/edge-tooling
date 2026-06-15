@@ -77,6 +77,21 @@ def parse_structured_summary(filepath):
             "release": data.get("release", ""),
             "finished": data.get("finished", ""),
             "remediation": data.get("remediation", ""),
+            # Investigation fields (absent in older reports — default empty)
+            "confidence": data.get("confidence", ""),
+            "causal_chain": [
+                link for link in (data.get("causal_chain") or [])
+                if isinstance(link, dict) and "cause" in link
+            ][:5],
+            "analysis_gaps": [
+                gap for gap in (data.get("analysis_gaps") or [])
+                if isinstance(gap, str)
+            ],
+            "history": data.get("history") if isinstance(data.get("history"), dict) else {},
+            "scenarios": [
+                s for s in (data.get("scenarios") or [])
+                if isinstance(s, str)
+            ],
         })
 
     return results
