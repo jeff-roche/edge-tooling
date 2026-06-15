@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 import requests
 
 from ..config import Config
@@ -13,15 +15,17 @@ logger = logging.getLogger(__name__)
 
 BASE_URL = "https://sippy.dptools.openshift.org"
 JOBS_URL = f"{BASE_URL}/api/jobs"
-_session = create_session()
 
 
-def fetch_edge_jobs(release: str, config: Config) -> list[dict]:
+def fetch_edge_jobs(
+    release: str, config: Config, session: requests.Session | None = None
+) -> list[dict]:
     """Fetch jobs from Sippy and filter for edge topologies."""
     logger.info(f"Fetching Sippy jobs for release {release}")
 
+    s = session or create_session()
     try:
-        resp = _session.get(JOBS_URL, params={"release": release}, timeout=30)
+        resp = s.get(JOBS_URL, params={"release": release}, timeout=30)
         resp.raise_for_status()
         all_jobs = resp.json()
     except requests.RequestException as e:
@@ -90,18 +94,38 @@ def identify_regressions(
     return regressions
 
 
-def collect(config: Config, versions: list[str]) -> dict[str, list[Regression]]:
-    """Collect Sippy regressions for all configured versions.
-
-    Returns a dict mapping version -> list of regressions.
-    """
-    results = {}
-    for version in versions:
-        edge_jobs = fetch_edge_jobs(version, config)
+def _collect_version(version: str, config: Config) -> tuple[str, list[Regression]]:
+    """Collect regressions for a single version."""
+    session = create_session()
+    try:
+        edge_jobs = fetch_edge_jobs(version, config, session=session)
         regressions = identify_regressions(edge_jobs)
         if regressions:
             logger.info(
                 f"  {version}: {len(regressions)} edge job regressions detected"
             )
-        results[version] = regressions
+        return version, regressions
+    finally:
+        session.close()
+
+
+def collect(config: Config, versions: list[str]) -> dict[str, list[Regression]]:
+    """Collect Sippy regressions for all configured versions in parallel.
+
+    Returns a dict mapping version -> list of regressions.
+    """
+    results = {}
+    with ThreadPoolExecutor(max_workers=min(len(versions) or 1, 10)) as pool:
+        futures = {
+            pool.submit(_collect_version, v, config): v
+            for v in versions
+        }
+        for future in as_completed(futures):
+            v = futures[future]
+            try:
+                version, regressions = future.result()
+                results[version] = regressions
+            except Exception as e:  # broad catch: isolate per-version failures
+                logger.error(f"Sippy collection failed for {v}: {e}")
+                results[v] = []
     return results
