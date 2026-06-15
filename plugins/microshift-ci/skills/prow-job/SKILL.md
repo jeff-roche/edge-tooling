@@ -79,6 +79,7 @@ To determine the GCS path from any job URL, strip the web prefix and replace wit
 ## Important Files
 
 > These files are available after artifacts are downloaded (via the download script or workflow step 0).
+> For a map of which artifact answers which question (scenario naming, journal patterns, sosreport layout, timeout cascades), read `references/microshift-ci-primer.md` next to this skill.
 
 - `<TMP>/build-log.txt`: Log containing prow job output and most likely place to identify AWS infra related or hypervisor related errors.
 - `<STEP>/build-log.txt`: Each step in the CI job is individually logged in a build-log.txt file.
