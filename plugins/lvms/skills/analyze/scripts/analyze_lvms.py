@@ -119,13 +119,16 @@ class LVMSAnalyzer:
         ns_dir = self.base / "namespaces" / self.ns
         oc_out = ns_dir / "oc_output"
 
-        # LVMCluster
+        # LVMCluster — try oc_output (LVMS must-gather), then API group dirs (general must-gather)
         lc_file = oc_out / "lvmcluster.yaml"
         if lc_file.exists():
             self.lvmclusters = extract_items(load_yaml(lc_file))
         else:
             for f in ns_dir.rglob("lvmclusters.yaml"):
                 self.lvmclusters.extend(extract_items(load_yaml(f)))
+            if not self.lvmclusters:
+                for f in ns_dir.rglob("lvmclusters/*.yaml"):
+                    self.lvmclusters.extend(extract_items(load_yaml(f)))
 
         # Pods
         pods_dir = ns_dir / "pods"
@@ -252,8 +255,15 @@ class LVMSAnalyzer:
     def analyze_lvmcluster(self):
         section("LVMCLUSTER STATUS")
         if not self.lvmclusters:
-            warn("No LVMCluster resources found")
-            self.issues['critical'].append("No LVMCluster configured")
+            has_lvms_components = bool(self.pods or self.deployments or self.daemonsets)
+            if has_lvms_components:
+                warn("No LVMCluster resources found (general OCP must-gather does not capture CRDs)")
+                info("Use LVMS-specific must-gather for full analysis:")
+                info("  oc adm must-gather --image=quay.io/lvms_dev/lvms-must-gather:latest")
+                self.issues['warning'].append("LVMCluster data not available (use LVMS must-gather for CRD data)")
+            else:
+                warn("No LVMCluster resources found")
+                self.issues['critical'].append("No LVMCluster configured")
             return
 
         for cluster in self.lvmclusters:
