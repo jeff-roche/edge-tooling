@@ -42,7 +42,7 @@ def classify_breakdown(stack_layer, step_name="", error_signature="",
         return "build"
 
     lower = stack_layer.lower()
-    if lower in INFRA_LAYERS:
+    if infrastructure_failure is None and lower in INFRA_LAYERS:
         return "infrastructure"
     if lower in BUILD_LAYERS:
         return "build"

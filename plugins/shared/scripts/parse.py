@@ -24,6 +24,8 @@ SIMILARITY_THRESHOLD = 0.50
 
 
 def _parse_bool(value):
+    if value is None:
+        return None
     if isinstance(value, str):
         return value.lower() == "true"
     return bool(value)

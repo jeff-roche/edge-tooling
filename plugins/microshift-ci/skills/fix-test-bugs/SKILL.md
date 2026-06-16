@@ -119,7 +119,7 @@ Summary counters:
 ```text
 SUMMARY
   Total groups: N (M bugs) | Eligible: N (M bugs) | Skipped: N (M bugs)
-  Skip breakdown: PR exists=N, outside allowed dirs=N, not code-fixable=N
+  Skip breakdown: PR exists=N, outside allowed dirs=N, not code-fixable=N, low confidence=N
 ```
 
 Save the report to `<WORKDIR>/report-fix-test-bugs.txt`.
