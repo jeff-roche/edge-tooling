@@ -3,7 +3,7 @@ name: microshift-ci:prow-job
 argument-hint: <prow-job-url-or-artifacts-dir>
 description: Download Prow job artifacts, identify root cause of failure, and produce a structured error report
 user-invocable: true
-allowed-tools: Skill, Bash, Read, Write, Glob, Grep, Agent, mcp__openshift-ci__get_job_runs, mcp__openshift-ci__get_job_report, mcp__openshift-ci__search_ci_logs
+allowed-tools: Skill, Bash, Read, Write, Glob, Grep, Agent
 ---
 
 # microshift-ci:prow-job
@@ -204,20 +204,14 @@ The user argument is: `<ARGUMENTS>`
    - **Always check for container restarts.** Grep the journal for repeated `Created container`/`Started container` (crio) and `RemoveContainer`/PLEG events (kubelet) for the same pod. Two container instances for one pod means the first one DIED — a single startup story is the wrong narrative. Read the dead container's log to learn why it exited: in the sosreport at `sos_commands/microshift/namespaces/<namespace>/pods/<pod>/<container>/<container>/logs/previous.log` (`current.log` is the running instance). The last ~20 lines of `previous.log` usually state the exit reason (fatal error, leader election lost, panic, OOM).
    - Record every accepted hop as a causal-chain link with its evidence file and line — these become `causal_chain` in the report. Discarded hypotheses do not go into the chain.
 
-5. **Corroborate — check the explanation against history and sibling failures**:
-   - Query the job's recent history with the `mcp__openshift-ci__get_job_runs` tool (openshift-ci MCP, backed by Sippy): when did this job last pass, how many consecutive failures, do passes and failures interleave? Populate the `history` field. If the MCP is not available, record `"job history unavailable"` in `analysis_gaps` and move on — do not try to reconstruct history another way.
-   - Interpret job-level history by job type:
-     - **Non-scenario-based jobs** (e.g., the conformance and ai-model-serving periodics, which run their tests directly): job history IS the test history — use it directly to date the regression and set `flake_likelihood`.
-     - **Scenario-based jobs** (~20 scenarios per job): a job-level failure streak does NOT mean *this* scenario failed each time — any failing scenario fails the job. Treat job history as a weak signal and set `flake_likelihood` conservatively.
-     - **Presubmit (PR) jobs**: history spans many PRs testing different code — use it only as a flakiness baseline for the job, never to date a regression.
-   - Optionally check whether the raw error appears in other jobs with `mcp__openshift-ci__search_ci_logs` (it indexes build logs and junit only — scenario-internal logs like `rf-debug.log` are not searchable). The same error across many jobs or releases points at infrastructure or payload-wide causes.
-   - When `history` yields a last-pass date and the source checkout is available, list the commits in the failure window:
+5. **Corroborate — cross-check the explanation**:
+   - When the source checkout is available, list commits from the last month that could be related:
 
      ```text
-     bash plugins/microshift-ci/scripts/repo-log.sh <SRC_DIR> --since <last_pass> --until <first_fail> --paths test/
+     bash plugins/microshift-ci/scripts/repo-log.sh <SRC_DIR> --since <1_MONTH_BEFORE_FINISHED> --until <FINISHED_DATE> --paths test/
      ```
 
-     (drop `--paths` to see all changes). Name candidate commits in the causal chain when their timing and touched paths match the failure.
+     Derive `FINISHED_DATE` from the job's `finished.json` timestamp. Drop `--paths` to see all changes. Name candidate commits in the causal chain when their timing and touched paths match the failure.
    - If multiple scenarios in this job failed, decide cascade vs independent using the **timeline** (which failed first; did the earlier failure poison shared state?), not just error-text similarity.
 
 6. **Produce a report**: Create a concise report of the failure. The report MUST specify:
@@ -232,7 +226,6 @@ The user argument is: `<ARGUMENTS>`
 - `gsutil` CLI must be installed for GCS access (uses anonymous access on public buckets; only needed for URL input — pre-downloaded artifacts skip it)
 - Internet access to fetch job data from Prow/GCS
 - Bash shell
-- openshift-ci MCP server configured (optional — used for job history in the corroborate phase; when absent, `history` is skipped and recorded in `analysis_gaps`)
 
 ## Tips
 
@@ -291,7 +284,6 @@ After the human-readable report above, append a machine-readable JSON block for 
     ],
     "confidence": "medium",
     "analysis_gaps": [],
-    "history": {"last_pass": "2026-05-28", "consecutive_failures": 4, "flake_likelihood": "low"},
     "scenarios": ["el96-lrel@standard1", "el94-y2@el96-lrel@standard1"]
   }
 ]
@@ -314,8 +306,7 @@ After the human-readable report above, append a machine-readable JSON block for 
 - `finished`: the job finish date in YYYY-MM-DD format, extracted from finished.json timestamp field or build log timestamps
 - `causal_chain`: array of links from the observed symptom toward the root cause, in order, built during the drill-down phase. Each link is `{"cause": ..., "evidence": ..., "quote": ...}` where `evidence` is the artifact file path (relative to the artifacts dir, with `:line` where applicable) and `quote` is a short verbatim excerpt supporting the link — copied exactly, with NO prepended labels, summaries, or commentary. The evidence path MUST be a file that actually exists — cite the path you read, not a description of it. **Before finalizing the report, re-read every cited `file:line` and confirm the quote is actually there** — a wrong citation destroys trust in the whole analysis and is worse than an honest gap. A single-link chain is valid when the anchor error IS the actionable cause
 - `confidence`: one of `high`, `medium`, `low` (see CONFIDENCE rules below)
-- `analysis_gaps`: array of strings naming evidence that was missing or could not be checked (e.g. `"no sosreport in artifacts"`, `"job history not fetched"`). Empty array when nothing was skipped
-- `history`: object `{"last_pass": "YYYY-MM-DD"|null, "consecutive_failures": N|null, "flake_likelihood": "high"|"medium"|"low"|"unknown"}` from the corroborate phase (job-level, via the openshift-ci MCP). Use `null`/`"unknown"` for what could not be determined
+- `analysis_gaps`: array of strings naming evidence that was missing or could not be checked (e.g. `"no sosreport in artifacts"`, `"source checkout not available"`). Empty array when nothing was skipped
 - `scenarios`: array of scenario names in which this failure occurred, taken from the `scenario-info/<scenario>/` directory names or the junit `testsuite name` (e.g. `["el96-lrel@standard2"]`). Empty array `[]` for non-scenario-based jobs and for build/infra failures that happen before scenarios run
 
 ### CONFIDENCE rules
