@@ -186,16 +186,7 @@ cmd_prepare() {
 
     # Pre-extract sosreport tarballs so analysis agents start with indexed data
     if [[ -d "${WORKDIR}/artifacts" ]]; then
-        local sos_dirs
-        sos_dirs=$(find "${WORKDIR}/artifacts" -name 'sosreport-*.tar.xz' -printf '%h\n' 2>/dev/null | sort -u)
-        if [[ -n "${sos_dirs}" ]]; then
-            echo "=== Extracting sosreports ===" >&2
-            local sos_count=0
-            while IFS= read -r d; do
-                bash "${SCRIPT_DIR}/extract-sosreport.sh" "${d}" "${d}/sos-extracted" && ((sos_count++)) || true
-            done <<< "${sos_dirs}"
-            echo "  Extracted sosreports in ${sos_count} directory(ies)" >&2
-        fi
+        bash "${SCRIPT_DIR}/extract-sosreport.sh" "${WORKDIR}/artifacts"
     fi
 
     # Optional read-only source checkout for analysis agents.

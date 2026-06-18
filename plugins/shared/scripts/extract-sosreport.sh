@@ -4,19 +4,15 @@ set -euo pipefail
 # Extract sosreport archives from downloaded Prow job artifacts and write
 # a JSON index of the high-signal files inside them.
 #
-# Shared across components (MicroShift, LVMS, etc.) via symlinks in each
-# plugin's scripts/ directory. Intended for analysis agents that cannot
-# run tar directly (CI permission allowlist) — this script is the one
-# permitted mechanism for sosreport extraction.
-#
 # Usage:
-#   extract-sosreport.sh <artifacts-dir> <dest>
+#   extract-sosreport.sh <top-dir>
 #
-#   <artifacts-dir>: local job artifacts directory (searched recursively
-#                    for sosreport-*.tar.xz)
-#   <dest>:          extraction destination directory
+#   <top-dir>: root directory to search recursively for sosreport-*.tar.xz.
+#              Tarballs are grouped by parent directory; each group is
+#              extracted into <parent-dir>/sos-extracted/ with its own
+#              index.json.
 #
-# Output: writes <dest>/index.json:
+# Output: writes <parent-dir>/sos-extracted/index.json per directory:
 #   {"sosreports": [{
 #      "archive": "<tarball path>",
 #      "extracted_to": "<dir>",
@@ -25,8 +21,8 @@ set -euo pipefail
 #      "highlights": [{"file": "...", "line": N, "text": "..."}]
 #   }]}
 #
-# Extraction is idempotent: if <dest>/index.json already exists the
-# script exits immediately.
+# Extraction is idempotent: directories with an existing index.json are
+# skipped.
 #
 # Progress/errors: stderr. Absence of sosreports is NOT an error — the
 # caller records it as an analysis gap.
@@ -35,21 +31,20 @@ HIGHLIGHT_RE='panic|OOM|oom-kill|segfault|Failed to start|level=error|FATAL|lead
 MAX_HIGHLIGHTS=100
 
 usage() {
-    echo "Usage: $(basename "$0") <artifacts-dir> <dest>" >&2
+    echo "Usage: $(basename "$0") <top-dir>" >&2
     exit 1
 }
 
-main() {
-    [[ ${#} -ne 2 ]] && usage
+# Extract all sosreport-*.tar.xz in a single directory and write its
+# sos-extracted/index.json.
+extract_dir() {
     local artifacts_dir="${1}"
-    local dest="${2}"
-
-    [[ -d "${artifacts_dir}" ]] || { echo "Error: not a directory: ${artifacts_dir}" >&2; exit 1; }
+    local dest="${artifacts_dir}/sos-extracted"
 
     local -a tarballs=()
     while IFS= read -r t; do
         tarballs+=("${t}")
-    done < <(find "${artifacts_dir}" -name 'sosreport-*.tar.xz' | sort)
+    done < <(find "${artifacts_dir}" -maxdepth 1 -name 'sosreport-*.tar.xz' | sort)
 
     if [[ -f "${dest}/index.json" ]]; then
         echo "Cached: ${dest}/index.json" >&2
@@ -57,13 +52,10 @@ main() {
     fi
 
     if [[ ${#tarballs[@]} -eq 0 ]]; then
-        echo "No sosreports found in ${artifacts_dir}" >&2
-        mkdir -p "${dest}"
-        echo '{"sosreports": [], "note": "no sosreport found"}' > "${dest}/index.json"
         return 0
     fi
 
-    echo "Found ${#tarballs[@]} sosreport(s)" >&2
+    echo "Found ${#tarballs[@]} sosreport(s) in ${artifacts_dir}" >&2
 
     local result='{"sosreports": []}'
     local tarball
@@ -124,8 +116,31 @@ main() {
             }]')
     done
 
+    mkdir -p "${dest}"
     echo "${result}" > "${dest}/index.json"
     echo "Index written to ${dest}/index.json" >&2
+}
+
+main() {
+    [[ ${#} -ne 1 ]] && usage
+    local top_dir="${1}"
+
+    [[ -d "${top_dir}" ]] || { echo "Error: not a directory: ${top_dir}" >&2; exit 1; }
+
+    local sos_dirs
+    sos_dirs=$(find "${top_dir}" -name 'sosreport-*.tar.xz' -printf '%h\n' 2>/dev/null | sort -u)
+
+    if [[ -z "${sos_dirs}" ]]; then
+        echo "No sosreports found under ${top_dir}" >&2
+        return 0
+    fi
+
+    echo "=== Extracting sosreports ===" >&2
+    local count=0
+    while IFS= read -r d; do
+        extract_dir "${d}" && ((count++)) || true
+    done <<< "${sos_dirs}"
+    echo "  Extracted sosreports in ${count} directory(ies)" >&2
 }
 
 main "${@}"
