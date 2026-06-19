@@ -101,7 +101,7 @@ Compute once at the start by running `date +%y%m%d` and substituting into the pa
    Job: <JOB_NAME>
    URL: <JOB_URL>
    Performance graphs (if generated): <WORKDIR>/graphs/<JOB_ID>/
-   MicroShift source (if present): <WORKDIR>/src/microshift-release-<RELEASE>/
+   MicroShift source (if present): <WORKDIR>/src/microshift/ (for main) or <WORKDIR>/src/microshift-release-<RELEASE>/ (for release branches)
    1. Run /microshift-ci:prow-job <ARTIFACTS_DIR>
    2. Your goal is the UNDERLYING root cause, not the first error in the log — follow the
       skill's drill-down and causal-chain requirements, consulting the sosreport and the
