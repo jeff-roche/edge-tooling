@@ -161,24 +161,26 @@ Per scenario, under
      workloads.
   Match report to failure by comparing the sosreport's capture timestamp
   with the failure timestamp from `rf-debug.log`.
-- Extract with `bash plugins/microshift-ci/scripts/extract-sosreport.sh <dir>`
-  and read its JSON index (journals, namespace pod logs, pre-grepped
-  highlights).
+- **Journals:** use the plain-text `journal_*.log` files next to the
+  sosreport tarballs — no extraction needed.
+- **Pod logs:** extract a specific tarball with
+  `bash plugins/shared/scripts/extract-sosreport.sh <tarball>`.
+  This extracts pod logs, inspect outputs, and cluster-scoped
+  resources (not journals or the full filesystem) into
+  `<tarball-parent>/sos-extracted/<sosreport-name>/`.
 - The on-failure listener respects the `SKIP_SOS` environment variable —
   when `true`, no on-failure reports are generated (development
   environments only; CI always collects them).
 - Inside an extracted report:
-  - Full system journal: `sos_commands/logs/journalctl_--no-pager`
-    — contains ALL services (microshift-tuned, greenboot, crio,
-    kubelet, NetworkManager, etc.). Use this when investigating
-    non-MicroShift services or cross-service interactions.
-  - MicroShift journal: `sos_commands/microshift/journalctl_--no-pager_--unit_microshift`
-    — filtered to the microshift unit only.
   - Per-namespace pod logs:
     `sos_commands/microshift/namespaces/<ns>/pods/<pod>/<container>/<container>/logs/current.log`
     — and `previous.log` when the container was restarted. **The tail of
     `previous.log` states why the container died** (fatal error, leader
     election lost, panic).
+  - Cluster-scoped resources:
+    `sos_commands/microshift/cluster-scoped-resources/` — nodes, CRDs,
+    webhooks.
+  - Component inspect outputs: `sos_commands/*/inspect_*`.
 
 ## Greenboot health check
 

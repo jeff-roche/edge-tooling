@@ -184,12 +184,6 @@ cmd_prepare() {
         fi
     fi
 
-    # Pre-extract sosreport tarballs so analysis agents start with indexed data
-    if [[ -d "${WORKDIR}/artifacts" ]]; then
-        bash "${SCRIPT_DIR}/extract-sosreport.sh" "${WORKDIR}/artifacts" || \
-            echo "  WARNING: sosreport extraction had errors (non-fatal)" >&2
-    fi
-
     # Optional read-only source checkout for analysis agents.
     # Deliberately separate from ${WORKDIR}/<name> used by fix-test-bugs.sh
     # (which sets up fork remotes for pushing). Failures here are non-fatal.
