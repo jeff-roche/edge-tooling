@@ -81,7 +81,7 @@ def parse_structured_summary(filepath):
             "causal_chain": [
                 link for link in (data.get("causal_chain") or [])
                 if isinstance(link, dict) and "cause" in link
-            ][:5],
+            ][:10],
             "analysis_gaps": [
                 gap for gap in (data.get("analysis_gaps") or [])
                 if isinstance(gap, str)
