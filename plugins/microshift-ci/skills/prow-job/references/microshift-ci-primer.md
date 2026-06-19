@@ -35,11 +35,11 @@ Key runtime settings (overridable per scenario):
   test ordering in `rf-debug.log` varies between runs.
 - `TEST_EXCLUDES` — tag-based exclusion (default `none`).
 
-## Deployment types: ostree vs bootc
+## Deployment types: ostree vs bootc vs RPM
 
-There are two distinct image pipelines for deploying MicroShift on VMs.
-Scenarios (`.sh` files) are the same structure for both, but the images
-they reference are built differently:
+There are three distinct deployment pipelines for MicroShift on VMs.
+Scenarios (`.sh` files) are the same structure for all three, but how
+MicroShift gets onto the VM differs:
 
 - **ostree (rpm-ostree)** — images defined as TOML blueprints in
   `test/image-blueprints/`. Built by `osbuild-composer` into
@@ -49,10 +49,16 @@ they reference are built differently:
   support) in `test/image-blueprints-bootc/`. Built as OCI container
   images, installed via bootc. Scenarios live under
   `test/scenarios-bootc/`.
+- **RPM** — a non-ostree RHEL system installed from a live image
+  (`kickstart-liveimg.ks.template` with `main-liveimg.cfg`), similar
+  to isolated/offline scenarios. MicroShift may be pre-installed in the
+  image or installed at test time via `dnf` from source-built or Brew
+  RPM repos. RPM suites live in `test/suites/rpm/` (install,
+  upgrade, remove).
 
 The job name indicates which pipeline was used (e.g.
-`e2e-aws-tests-bootc-*` vs `e2e-aws-tests-*`). Both produce the same
-artifact layout under `scenario-info/`.
+`e2e-aws-tests-bootc-*` vs `e2e-aws-tests-*`). All three produce the
+same artifact layout under `scenario-info/`.
 
 ## Scenario naming
 
