@@ -68,7 +68,11 @@ extract_dir() {
         mkdir -p "${outdir}"
         # Sosreport tarballs contain a single top-level directory named
         # after the archive — strip it so files land directly in outdir.
-        tar --no-same-owner --strip-components=1 -xf "${tarball}" -C "${outdir}"
+        if ! tar --no-same-owner --strip-components=1 -xf "${tarball}" -C "${outdir}" 2>&1; then
+            echo "  WARNING: failed to extract ${name}, skipping" >&2
+            rm -rf "${outdir}"
+            continue
+        fi
 
         # Index high-signal locations. Journal command output lands under
         # per-plugin dirs (sos_commands/logs/, sos_commands/microshift/, ...).
