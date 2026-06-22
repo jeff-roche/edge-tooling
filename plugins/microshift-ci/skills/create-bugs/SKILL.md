@@ -172,7 +172,7 @@ mcp__jira__jira_search(
 
 Record **every** result as a regression entry — these are shown in the HTML report with distinct "Regressions" styling.
 
-**Note**: Run searches in parallel where possible. All three searches (A, B, C) can run concurrently per candidate.
+**Note**: Run searches in parallel where possible. All three searches (A, B, C) can run concurrently per candidate. When using sub-agents for Jira searches, launch them as **foreground** agents in a **single message** (do NOT use `run_in_background`). Foreground agents in the same messagerun concurrently — this is just as fast as background agents but keeps your turn active until all complete and lets you collect results for the bug mapping files.
 
 **Recording results — duplicates and regressions**:
 
