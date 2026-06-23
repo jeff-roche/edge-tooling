@@ -218,12 +218,3 @@ for confirmation, executes.
 **User**: `/small-commits`
 
 Explicit invocation — same workflow.
-
-## Notes
-
-- **Side effects**: Creates git commits on the current branch and
-  optionally rewrites local history via rebase. Confirms the commit
-  plan before executing and confirms before any rebase.
-- **No push**: Never pushes to a remote.
-- **PR branches are personal**: Rewriting history on non-main branches
-  is expected. Do not warn about force-push implications.
