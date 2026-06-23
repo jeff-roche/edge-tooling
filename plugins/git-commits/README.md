@@ -13,18 +13,17 @@ entire files at once.
 
 ## Usage
 
-Invoke explicitly:
+Always active — whenever you ask to commit changes, the skill plans
+small, logical commits automatically. You can also invoke explicitly:
 
 ```text
 /small-commits
 ```
 
-Or trigger automatically by mentioning:
+After presenting the commit plan, you choose:
 
-- "create small commits"
-- "clean git history"
-- "commit this in small logical pieces"
-- "make good commits"
+- **Create commits** — stages and commits each piece
+- **Propose only** — shows commit messages and file groupings without committing
 
 ## What It Does
 

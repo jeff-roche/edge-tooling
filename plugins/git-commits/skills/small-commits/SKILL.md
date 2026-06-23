@@ -1,16 +1,19 @@
 ---
 name: small-commits
-description: "Create small, well-structured git commits that tell a coherent implementation story. Use when the user says: small commits, clean commits, good git history, logical commits, commit in small pieces, split commits, atomic commits, granular commits, structured commits, commit story, clean history. Not for PR creation."
+description: "Always-on commit structuring. Activates whenever the user asks to commit uncommitted changes — plans small, logical commits by default. The user chooses whether to create the commits or just see the proposals. Not for PR creation."
 user-invocable: true
 allowed-tools: Bash, Read, Write
 ---
 
 # small-commits
 
-Structure uncommitted changes into small, logical git commits. Each
-commit represents one coherent idea — a single function, a config
-change, a test, a refactor step. The git log reads like a story of
-how the implementation was built.
+When the user asks to commit changes, always plan with small commits
+in mind. Each commit represents one coherent idea — a single function,
+a config change, a test, a refactor step. The git log reads like a
+story of how the implementation was built.
+
+After presenting the plan, the user chooses: create the commits, or
+just see the proposed messages.
 
 ## Prerequisites
 
@@ -60,9 +63,26 @@ Present the plan to the user:
 4. Update README with new config format
 ```
 
-Wait for the user to confirm or adjust before proceeding.
+Then ask how they want to proceed:
 
-### 3. Stage and Commit Each Piece
+```text
+How would you like to proceed?
+- **Create commits** — I'll stage and commit each piece
+- **Propose only** — I'll show the commit messages and file groupings, you drive
+```
+
+Wait for the user to choose before proceeding.
+
+### 3. Execute the Plan
+
+#### Propose-only mode
+
+For each planned commit, show:
+
+- The proposed commit message (subject + optional body)
+- The list of files and hunks that belong to it
+
+#### Create-commits mode
 
 For each planned commit, stage ONLY the changes that belong to it.
 
@@ -204,16 +224,15 @@ git log --oneline
 
 ## Examples
 
-**User**: "I've made a bunch of changes, can you create small commits?"
+**User**: "commit my changes"
 
-Runs `git diff --stat`, identifies 5 changed files spanning 3 logical
-changes, presents a 3-commit plan, stages and commits each piece,
-shows the final log.
+Activates automatically. Surveys changes, plans 3 logical commits,
+asks "Create commits or propose only?", proceeds accordingly.
 
-**User**: "Small commits please" (mid-conversation after making changes)
+**User**: "commit this" (with a small single-purpose change)
 
-Auto-invokes this skill, surveys changes, proposes a commit plan, asks
-for confirmation, executes.
+Plans a single commit, asks the user to confirm. Even for one commit,
+the skill ensures the message is well-structured.
 
 **User**: `/small-commits`
 
