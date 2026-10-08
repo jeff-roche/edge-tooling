@@ -361,13 +361,13 @@ function managedDisk(
   files: Record<string, string>,
   dirs: Record<string, string[]>,
   git: Record<string, FakeGitFolder>,
-  onExec: (argv: string[], cwd: string) => void = () => {},
+  onExec: (argv: string[], cwd: string, env?: Record<string, string>) => void = () => {},
 ): Deps {
   const inner = fakeWorkspace([], git)
   return {
     ...inner,
-    exec: async (argv, cwd) => {
-      onExec(argv, cwd)
+    exec: async (argv: string[], cwd: string, env?: Record<string, string>) => {
+      onExec(argv, cwd, env)
       if (argv[0] === 'python3') return { exitCode: 0, stdout: PROJECTS_JSON, stderr: '' }
       return inner.exec(argv, cwd)
     },
@@ -382,12 +382,12 @@ const PROJECTS_JSON = JSON.stringify({
 })
 
 test('discoverWorkspace: a managed workspace scans repos/ and lists its projects', async () => {
-  const calls: string[][] = []
+  const calls: { argv: string[]; cwd: string; env?: Record<string, string> }[] = []
   const deps = managedDisk(
     { '/ws/dev-env.yaml': '' },
     { '/ws': ['repos', 'projects', 'domains'], '/ws/repos': ['api', 'docs'] },
     { '/ws/repos/api': { toplevel: '/ws/repos/api', worktrees: ['/ws/repos/api'] } },
-    argv => calls.push(argv),
+    (argv, cwd, env) => calls.push({ argv, cwd, env }),
   )
   const model = await discoverWorkspace('/ws', deps, { projectsScript: '/plugin/scripts/projects.py' })
   expect(model.mode).toBe('workspace')
@@ -396,7 +396,9 @@ test('discoverWorkspace: a managed workspace scans repos/ and lists its projects
   expect(model.otherFolders).toEqual(['docs'])
   expect(model.projects.map(p => p.name)).toEqual(['fix-it'])
   expect(model.projects[0]!.tasks).toEqual({ checked: 1, total: 3 })
-  expect(calls).toContainEqual(['python3', '/plugin/scripts/projects.py', 'list'])
+  expect(calls).toContainEqual({
+    argv: ['python3', '/plugin/scripts/projects.py', 'list'], cwd: '/ws', env: { WORKSPACE_ROOT: '/ws' },
+  })
 })
 
 test('discoverWorkspace: repos/ wins even when the workspace root is a git repo itself', async () => {

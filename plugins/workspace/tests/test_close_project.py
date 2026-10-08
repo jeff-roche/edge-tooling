@@ -181,6 +181,19 @@ class TestCheck(Fixture):
         self.assertTrue(w["no_upstream"])
         self.assertEqual(w["ahead"], 0)
 
+    def test_pr_without_upstream_reports_local_commits(self):
+        _, _, wt = self.multi_project(branch="pr/5")
+        git("branch", "--unset-upstream", cwd=wt)
+        (wt / "local.txt").write_text("local work\n")
+        git("add", ".", cwd=wt)
+        git("commit", "-m", "local work", cwd=wt)
+
+        w = check(self.ws, "demo")["worktrees"][0]
+
+        self.assertTrue(w["no_upstream"])
+        self.assertFalse(w["dirty"])
+        self.assertEqual(w["ahead"], 1)
+
     def test_missing_worktree_dir(self):
         _, _, wt = self.multi_project()
         shutil.rmtree(wt)
@@ -315,6 +328,7 @@ class TestApplyWorktrees(Fixture):
     def test_pr_branch_removed_with_force_delete(self):
         checkout = self.make_repo("alpha")
         git("branch", "pr/5", "origin/main", cwd=checkout)
+        git("branch", "--unset-upstream", "pr/5", cwd=checkout)
         wt = checkout / ".worktrees" / "pr" / "5"
         git("worktree", "add", "--", str(wt), "pr/5", cwd=checkout)
         (wt / "x.txt").write_text("x")
@@ -322,9 +336,10 @@ class TestApplyWorktrees(Fixture):
         git("commit", "-m", "unmerged", cwd=wt)  # -d would refuse this
         self.write_project("prproj", [
             "repos:\n  - alpha", "branch: pr/5", "worktrees:\n  - alpha"])
-        # no upstream + ahead-less pr branch: committed work is "ahead of
-        # nothing", so only discard removes it; use discard
+        self.assertFalse(git_ok("rev-parse", "--verify", "@{upstream}", cwd=wt))
+
         out = apply(self.ws, "prproj", "--worktrees", "discard")
+
         self.assertEqual(out["errors"], [])
         self.assertFalse(wt.exists())
         self.assertFalse(git_ok("show-ref", "--verify", "--quiet",
@@ -333,6 +348,7 @@ class TestApplyWorktrees(Fixture):
     def test_pr_branch_without_upstream_counts_as_clean(self):
         checkout = self.make_repo("alpha")
         git("branch", "pr/6", "origin/main", cwd=checkout)
+        git("branch", "--unset-upstream", "pr/6", cwd=checkout)
         wt = checkout / ".worktrees" / "pr" / "6"
         git("worktree", "add", "--", str(wt), "pr/6", cwd=checkout)
         self.write_project("prproj", [
@@ -340,6 +356,22 @@ class TestApplyWorktrees(Fixture):
         out = apply(self.ws, "prproj", "--worktrees", "remove")
         self.assertFalse(wt.exists())
         self.assertEqual(out["errors"], [])
+
+    def test_pr_local_commit_without_upstream_is_kept_under_remove(self):
+        _, checkout, wt = self.multi_project(branch="pr/5")
+        git("branch", "--unset-upstream", cwd=wt)
+        (wt / "local.txt").write_text("local work\n")
+        git("add", ".", cwd=wt)
+        git("commit", "-m", "local work", cwd=wt)
+        head = git("rev-parse", "HEAD", cwd=wt)
+
+        out = apply(self.ws, "demo", "--worktrees", "remove")
+
+        self.assertTrue(wt.is_dir())
+        self.assertEqual(git("rev-parse", "refs/heads/pr/5", cwd=checkout), head)
+        self.assertEqual(out["removed"], [])
+        self.assertIn("unpushed", out["kept"][0]["reason"])
+        self.assertIn("worktrees:\n  - alpha", self.fm("demo"))
 
     def test_worktree_already_gone_is_cleared(self):
         _, _, wt = self.multi_project()

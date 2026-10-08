@@ -275,12 +275,14 @@ class TestWorktrees(Fixture):
         self.assertEqual(out["worktrees"], [])
 
     def test_pr_flow(self):
-        self.make_repo("alpha")
+        checkout = self.make_repo("alpha")
         self.add_pr_ref("alpha", 7)
+
         out = run_create(self.ws, {
             "description": "Review PR", "type": "analysis",
             "repos": ["alpha"], "pr": {"alpha": 7},
             "links": ["https://github.com/o/alpha/pull/7"]})
+
         self.assertEqual(out["status"], "ok", out)
         self.assertEqual(out["errors"], [])
         path = self.ws / "repos/alpha/.worktrees/pr/7"
@@ -289,9 +291,41 @@ class TestWorktrees(Fixture):
         self.assertTrue((path / "pr7.txt").is_file())
         self.assertEqual(git("rev-parse", "--abbrev-ref", "HEAD", cwd=path),
                          "pr/7")
+        head = git("rev-parse", "HEAD", cwd=path)
+        self.assertEqual(git("rev-parse", "refs/remotes/origin/pr/7", cwd=checkout), head)
+        self.assertEqual(git("rev-list", "--count", "origin/main..HEAD", cwd=path), "1")
+
+        git("fetch", "origin", "main", cwd=checkout)
+
+        self.assertEqual(git("rev-parse", "refs/remotes/origin/pr/7", cwd=checkout), head)
         fm = frontmatter(self.project("review-pr") / "CLAUDE.md")
         self.assertIn("branch: pr/7", fm)
         self.assertIn("  - https://github.com/o/alpha/pull/7", fm)
+
+    def test_close_removes_a_clean_fetched_unmerged_pr(self):
+        checkout = self.make_repo("alpha")
+        self.add_pr_ref("alpha", 7)
+        out = run_create(self.ws, {"description": "Review PR", "type": "analysis",
+                                   "repos": ["alpha"], "pr": {"alpha": 7}})
+        self.assertEqual(out["errors"], [])
+        path = Path(out["worktrees"][0]["path"])
+        upstream = subprocess.run(["git", "rev-parse", "--verify", "@{upstream}"],
+                                  cwd=path, capture_output=True, env=GIT_ENV)
+        self.assertNotEqual(upstream.returncode, 0)
+        self.assertEqual(git("rev-list", "--count", "origin/main..HEAD", cwd=path), "1")
+        git("fetch", "origin", "main", cwd=checkout)
+
+        res = subprocess.run(
+            [sys.executable, str(SCRIPT.with_name("close-project.py")), "apply",
+             out["folder"], "--worktrees", "remove"], capture_output=True, text=True,
+            env={**GIT_ENV, "WORKSPACE_ROOT": str(self.ws)})
+
+        self.assertEqual(res.returncode, 0, res.stderr)
+        closed = json.loads(res.stdout)
+        self.assertEqual(closed["errors"], [])
+        self.assertFalse(path.exists())
+        self.assertEqual(sorted(r["kind"] for r in closed["removed"]),
+                         ["branch", "worktree"])
 
     def test_pr_flow_adds_repo_not_listed(self):
         self.make_repo("alpha")

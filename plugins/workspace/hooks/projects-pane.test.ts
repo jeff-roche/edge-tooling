@@ -137,6 +137,9 @@ test('opening a project loads its tasks; pressing one toggles it through the sha
   const edit = calls.find(c => c.argv[2] === 'toggle')
   expect(edit?.argv.slice(2)).toEqual(['toggle', 'fix-it', '--section', 'Fix Plan', '--text', 'Find root cause', '--occurrence', '0'])
   expect(edit?.env).toEqual({ WORKSPACE_ROOT: '/ws' })
+  const reload = calls.find(c => c.argv[1]?.endsWith('/projects.py'))
+  expect(reload?.cwd).toBe('/ws')
+  expect(reload?.env).toEqual({ WORKSPACE_ROOT: '/ws' })
   await ui.unmount()
 })
 

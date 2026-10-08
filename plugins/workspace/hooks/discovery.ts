@@ -9,7 +9,7 @@ import { loadProjects } from './projects'
 export type ExecResult = { exitCode: number; stdout: string; stderr: string }
 
 export type Deps = {
-  exec: (argv: string[], cwd: string) => Promise<ExecResult>
+  exec: (argv: string[], cwd: string, env?: Record<string, string>) => Promise<ExecResult>
   readFile: (path: string) => Promise<string | null> // null when missing
   listDir: (path: string) => Promise<{ name: string; isDir: boolean }[]>
   join: (...parts: string[]) => string

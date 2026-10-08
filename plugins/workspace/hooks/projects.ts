@@ -56,12 +56,12 @@ export function parseProjectsJson(result: Pick<ExecResult, 'exitCode' | 'stdout'
 
 /** Reads the projects of the workspace at `root`; a script that cannot run is an error string, not a throw. */
 export async function loadProjects(
-  exec: (argv: string[], cwd: string) => Promise<ExecResult>,
+  exec: (argv: string[], cwd: string, env?: Record<string, string>) => Promise<ExecResult>,
   script: string,
   root: string,
 ): Promise<ProjectsResult> {
   try {
-    return parseProjectsJson(await exec(['python3', script, 'list'], root))
+    return parseProjectsJson(await exec(['python3', script, 'list'], root, { WORKSPACE_ROOT: root }))
   } catch (err) {
     return { projects: [], error: `could not run projects.py: ${err instanceof Error ? err.message : String(err)}` }
   }

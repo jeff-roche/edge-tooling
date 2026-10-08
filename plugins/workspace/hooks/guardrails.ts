@@ -26,7 +26,31 @@ export function evaluateGitCommand(command: string, repo: RepoInfo, posture: Gua
   if (pushArgs !== null) {
     const target = prTarget(repo.remotes)
     const primary = repo.remotes.find(r => r.role === 'primary')?.name
-    const remoteArg = pushArgs.find(a => !a.startsWith('-'))
+    const valueOptions = new Set(['-o', '--push-option', '--receive-pack', '--exec'])
+    let positionalRepo: string | undefined
+    let repoOption: string | undefined
+
+    for (let i = 0; i < pushArgs.length; i++) {
+      const a = pushArgs[i]!
+
+      if (a === '--') {
+        positionalRepo ??= pushArgs[i + 1]
+        break
+      }
+      if (valueOptions.has(a)) {
+        i++
+        continue
+      }
+      // --repo supplies the destination itself, rather than an unrelated option value.
+      if (a === '--repo' || a.startsWith('--repo=')) {
+        repoOption = a === '--repo' ? pushArgs[++i] : a.slice('--repo='.length)
+        continue
+      }
+
+      if (!a.startsWith('-')) positionalRepo ??= a
+    }
+
+    const remoteArg = positionalRepo ?? repoOption
     if (remoteArg && target && target.role === 'canonical' && remoteArg === target.name) {
       const reason = `${repo.name}: pushing straight to '${remoteArg}' (PRs land there) — push to '${primary ?? 'your remote'}' and open a PR instead.`
       return posture === 'deny' ? { action: 'deny', reason } : { action: 'warn', reason }

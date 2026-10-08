@@ -37,6 +37,38 @@ test('evaluateGitCommand: push to the primary remote is always fine', async () =
   expect(evaluateGitCommand('git push origin feature-x', repo(), 'deny')).toEqual({ action: 'allow' })
 })
 
+for (const option of ['-o ci.skip', '--push-option ci.skip', '--receive-pack git-receive-pack', '--exec git-receive-pack']) {
+  test(`evaluateGitCommand: ${option} does not hide the push destination`, async () => {
+    expect(evaluateGitCommand(`git push ${option} upstream main`, repo(), 'deny').action).toBe('deny')
+    expect(evaluateGitCommand(`git push ${option} origin feature-x`, repo(), 'deny')).toEqual({ action: 'allow' })
+  })
+}
+
+for (const separator of [' ', '=']) {
+  test(`evaluateGitCommand: --repo${separator} supplies the push destination`, async () => {
+    expect(evaluateGitCommand(`git push --repo${separator}upstream`, repo(), 'deny').action).toBe('deny')
+    expect(evaluateGitCommand(`git push --repo${separator}origin`, repo(), 'deny')).toEqual({ action: 'allow' })
+  })
+
+  test(`evaluateGitCommand: a positional repo takes priority over --repo${separator}`, async () => {
+    for (const args of [
+      `--repo${separator}origin upstream main`,
+      `upstream main --repo${separator}origin`,
+      `--repo${separator}origin -- upstream main`,
+    ]) {
+      expect(evaluateGitCommand(`git push ${args}`, repo(), 'deny').action).toBe('deny')
+    }
+
+    for (const args of [
+      `--repo${separator}upstream origin feature-x`,
+      `origin feature-x --repo${separator}upstream`,
+      `--repo${separator}upstream -- origin feature-x`,
+    ]) {
+      expect(evaluateGitCommand(`git push ${args}`, repo(), 'deny')).toEqual({ action: 'allow' })
+    }
+  })
+}
+
 test('evaluateGitCommand: a repo with no separate canonical remote never flags its push (two-node-toolbox case)', async () => {
   const soleRemoteRepo = repo({ remotes: [{ name: 'origin', url: 'u1', role: 'primary' }] })
   expect(evaluateGitCommand('git push origin main', soleRemoteRepo, 'deny')).toEqual({ action: 'allow' })

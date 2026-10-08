@@ -370,7 +370,7 @@ export function registerUi(on: On, config: UiConfig) {
     const refresh = async (isDocSync: boolean) => {
       const root = config.workspaceRoot || (await $.session.root())
       const deps: Deps = {
-        exec: (argv, cwd) => $.process.run(argv, { cwd }),
+        exec: (argv, cwd, env) => $.process.run(argv, { cwd, env }),
         readFile: path => $.fs.read(path).then(t => (typeof t === 'string' ? t : null)).catch(() => null),
         listDir: path =>
           $.fs
@@ -434,7 +434,7 @@ export function registerUi(on: On, config: UiConfig) {
     const reloadProjects = async () => {
       const root = config.workspaceRoot || (await $.session.root())
       const fresh = await loadProjects(
-        (argv, cwd) => $.process.run(argv, { cwd }),
+        (argv, cwd, env) => $.process.run(argv, { cwd, env }),
         `${$.plugin.root}/scripts/projects.py`,
         root,
       )
@@ -445,7 +445,7 @@ export function registerUi(on: On, config: UiConfig) {
     const rescan = async () => {
       const root = config.workspaceRoot || (await $.session.root())
       const deps: Deps = {
-        exec: (argv, cwd) => $.process.run(argv, { cwd }),
+        exec: (argv, cwd, env) => $.process.run(argv, { cwd, env }),
         readFile: path => $.fs.read(path).then(t => (typeof t === 'string' ? t : null)).catch(() => null),
         listDir: path =>
           $.fs

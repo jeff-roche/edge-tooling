@@ -71,7 +71,7 @@ export function registerWorkspaceCommandHandler(on: On, config: WorkspaceCommand
 
     const root = config.workspaceRoot || (await $.session.root())
     const deps: Deps = {
-      exec: (argv, cwd) => $.process.run(argv, { cwd }),
+      exec: (argv, cwd, env) => $.process.run(argv, { cwd, env }),
       readFile: path => $.fs.read(path).then(t => (typeof t === 'string' ? t : null)).catch(() => null),
       listDir: path =>
         $.fs
@@ -103,9 +103,18 @@ export function registerWorkspaceCommandHandler(on: On, config: WorkspaceCommand
 
     // action === 'sync-doc': always write, regardless of autoSyncDoc.
     if (model.mode === 'single-repo') return { text: SINGLE_REPO_DOC_NOTE }
+
     const plan = planDocSyncFor(model, existing, true)
     await update($, docStatus, () => plan.status)
-    if (plan.write === null) return { text: 'No repos discovered; nothing to write.' }
+
+    if (plan.write === null) {
+      return {
+        text: model.repos.length === 0
+          ? 'No repos discovered; nothing to write.'
+          : `The workspace-map block in ${config.docFile} is already up to date.`,
+      }
+    }
+
     await $.fs.write(docPath, plan.write)
     return { text: `Updated the workspace-map block in ${config.docFile}.` }
   })

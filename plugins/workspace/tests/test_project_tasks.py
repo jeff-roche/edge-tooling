@@ -91,6 +91,50 @@ class TasksTest(unittest.TestCase):
         self.run_cmd("toggle", "--section", "B", "--text", "x")
         self.assertEqual(self.read(), "## A\n- [ ] x\n## B\n- [x] x\n")
 
+    def test_repeated_headings_share_occurrences_and_toggle_the_selected_item(self):
+        for heading in ("## A", "### A"):
+            with self.subTest(heading=heading):
+                first = f"{heading}\n- [ ] x\n- [ ] x\n"
+                second = f"{heading}\n- [ ] x\n"
+                self.write(FM + first + "## Other\n- [ ] x\n" + second)
+
+                sections = self.run_cmd("list")["sections"]
+                item = sections[2]["items"][0]
+                self.assertEqual([i["occurrence"] for s in sections
+                                  if s["heading"] == "A" for i in s["items"]],
+                                 [0, 1, 2])
+                res = self.run_cmd("toggle", "--section", "A", "--text", "x",
+                                   "--occurrence", str(item["occurrence"]))
+
+                self.assertEqual(res, {"status": "ok", "checked": True})
+                self.assertEqual(self.read(), FM + first + "## Other\n- [ ] x\n"
+                                 + f"{heading}\n- [x] x\n")
+
+    def test_remove_targets_the_item_under_a_repeated_heading(self):
+        for heading in ("## A", "### A"):
+            with self.subTest(heading=heading):
+                first = f"{heading}\n- [ ] x\n"
+                self.write(FM + first + f"{heading}\n- [ ] x\n")
+                item = self.run_cmd("list")["sections"][1]["items"][0]
+
+                res = self.run_cmd("remove", "--section", "A", "--text", "x",
+                                   "--occurrence", str(item["occurrence"]))
+
+                self.assertEqual(res, {"status": "ok"})
+                self.assertEqual(self.read(), FM + first + f"{heading}\n")
+
+    def test_add_under_a_repeated_heading_errors_without_writing(self):
+        content = FM + "## A\n- [ ] x\n### A\n- [ ] y\n"
+        self.write(content)
+        os.utime(self.path, (1000, 1000))
+        before = (self.read(), self.path.stat().st_mtime_ns)
+
+        res = self.run_cmd("add", "--section", "A", "--text", "new")
+
+        self.assertEqual(res["status"], "error")
+        self.assertIn("heading", res["error_message"])
+        self.assertEqual((self.read(), self.path.stat().st_mtime_ns), before)
+
     def test_add_after_last_item(self):
         self.write(FM + "## A\n- [ ] a\n- [x] b\n\nprose\n## B\n- [ ] c\n")
         self.assertEqual(self.run_cmd("add", "--section", "A", "--text", "new"), {"status": "ok"})

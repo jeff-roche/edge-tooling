@@ -457,7 +457,8 @@ def create_worktree(wt: dict, root: Path) -> str:
     path = str(wt["path"])
     if wt["kind"] == "pr":
         n = wt["number"]
-        res = git(["fetch", "--", "origin", f"+pull/{n}/head:pr/{n}"], checkout)
+        res = git(["fetch", "--", "origin", f"+pull/{n}/head:pr/{n}",
+                   f"+pull/{n}/head:refs/remotes/origin/pr/{n}"], checkout)
         if res.returncode != 0:
             return f"{label}: fetch of PR {n} failed: {res.stderr.strip()}"
         res = git(["worktree", "add", "--", path, f"pr/{n}"], checkout)

@@ -126,7 +126,7 @@ def parse_checklist(text: str) -> list[dict]:
     ``{"heading", "level", "line", "items"}`` where ``line`` is the heading's
     line index (-1 for the leading section) and each item is
     ``{"line", "text", "checked", "occurrence"}`` (``occurrence`` = 0-based
-    index among same-text items in that section).
+    index among same-text items across sections sharing that heading).
     """
     lines = text.splitlines(keepends=True)
     start = 0
@@ -137,7 +137,7 @@ def parse_checklist(text: str) -> list[dict]:
                 break
 
     sections: list[dict] = [{"heading": "", "level": 0, "line": -1, "items": []}]
-    seen: dict[tuple[int, str], int] = {}
+    seen: dict[tuple[str, str], int] = {}
     fence: str | None = None
     for idx in range(start, len(lines)):
         content = _eol_split(lines[idx])[0]
@@ -158,7 +158,9 @@ def parse_checklist(text: str) -> list[dict]:
         m = RE_CHECKLIST_ITEM.match(content)
         if m:
             item_text = m.group(4).strip()
-            key = (len(sections), item_text)
+            # Count by heading text: edits target heading+text+occurrence, and
+            # several sections may share a heading.
+            key = (sections[-1]["heading"], item_text)
             occ = seen.get(key, 0)
             seen[key] = occ + 1
             sections[-1]["items"].append({

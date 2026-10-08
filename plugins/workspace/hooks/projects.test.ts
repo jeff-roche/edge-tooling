@@ -1,8 +1,24 @@
 import { expect, test } from 'claude-code/testing'
 
-import { parseProjectsJson } from './projects'
+import { loadProjects, parseProjectsJson } from './projects'
 
 const ok = (body: unknown) => ({ exitCode: 0, stdout: JSON.stringify(body), stderr: '' })
+
+test('loadProjects selects the workspace root in cwd and env', async () => {
+  const calls: { argv: string[]; cwd: string; env?: Record<string, string> }[] = []
+  const exec = async (argv: string[], cwd: string, env?: Record<string, string>) => {
+    calls.push({ argv, cwd, env })
+    return ok({ status: 'ok', projects: [{ name: 'fix-it' }] })
+  }
+
+  const result = await loadProjects(exec, '/plugin/scripts/projects.py', '/chosen/ws')
+
+  expect(calls).toEqual([{
+    argv: ['python3', '/plugin/scripts/projects.py', 'list'], cwd: '/chosen/ws', env: { WORKSPACE_ROOT: '/chosen/ws' },
+  }])
+  expect(result.projects.map(p => p.name)).toEqual(['fix-it'])
+  expect(result.error).toBeNull()
+})
 
 test('parseProjectsJson maps the script output to projects', async () => {
   const { projects, error } = parseProjectsJson(

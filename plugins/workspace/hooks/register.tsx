@@ -121,7 +121,7 @@ export const register: Register = (on, options) => {
     const refresh = async () => {
       const root = opts.workspaceRoot || (await $.session.root())
       const deps: Deps = {
-        exec: (argv, cwd) => $.process.run(argv, { cwd }),
+        exec: (argv, cwd, env) => $.process.run(argv, { cwd, env }),
         readFile: path => $.fs.read(path).then(t => (typeof t === 'string' ? t : null)).catch(() => null),
         listDir: path =>
           $.fs
@@ -239,7 +239,7 @@ export const register: Register = (on, options) => {
 
     const root = opts.workspaceRoot || (await $.session.root())
     const deps: Deps = {
-      exec: (argv, cwd) => $.process.run(argv, { cwd }),
+      exec: (argv, cwd, env) => $.process.run(argv, { cwd, env }),
       readFile: path => $.fs.read(path).then(t => (typeof t === 'string' ? t : null)).catch(() => null),
       listDir: path =>
         $.fs

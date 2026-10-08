@@ -281,6 +281,11 @@ def inspect_worktree(wt: dict) -> dict:
     up = git(["rev-parse", "--verify", "@{upstream}"], path)
     if up.returncode != 0:
         info["no_upstream"] = True
+        if is_pr_branch(wt["branch"]):
+            # pr/<n> has no upstream; count commits that exist on no remote.
+            local = git(["rev-list", "--count", "HEAD", "--not", "--remotes"], path)
+            if local.returncode == 0 and local.stdout.strip().isdigit():
+                info["ahead"] = int(local.stdout.strip())
     else:
         ahead = git(["rev-list", "--count", "@{upstream}..HEAD"], path)
         if ahead.returncode == 0 and ahead.stdout.strip().isdigit():

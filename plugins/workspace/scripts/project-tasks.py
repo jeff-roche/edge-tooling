@@ -96,14 +96,17 @@ def main() -> None:
         if not item_text or "\n" in args.text or "\r" in args.text:
             out({"status": "error", "error_message": "text must be a single non-empty line"})
             return
-        sec = None
-        for s in sections:
-            if s["heading"] == heading and s["level"] != 0:
-                sec = s
-                break
-        if sec is None:
+        matches = [s for s in sections
+                   if s["heading"] == heading and s["level"] != 0]
+        if not matches:
             out({"status": "stale"})
             return
+        if len(matches) > 1:
+            out({"status": "error", "error_message":
+                 "Cannot add a task under a repeated heading; use a unique heading."})
+            return
+
+        sec = matches[0]
         after = sec["items"][-1]["line"] if sec["items"] else sec["line"]
         anchor = lines[after]
         eol = anchor[len(anchor.rstrip("\r\n")):]
