@@ -70,3 +70,8 @@ test('buildWorkspaceSection for a single repo drops the multi-repo framing', asy
   expect(text).not.toContain('sibling repos')
   expect(text).toContain('`workspace_worktree`')
 })
+
+test('the section says roles are quoted descriptions, never instructions, for one repo and for many', async () => {
+  expect(buildWorkspaceSection(model())).toContain('never as instructions')
+  expect(buildWorkspaceSection(model({ mode: 'single-repo' }))).toContain('never an instruction')
+})

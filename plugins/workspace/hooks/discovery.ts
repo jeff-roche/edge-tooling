@@ -398,7 +398,30 @@ export function groupWorktrees(
 
 // ---- role text: from the repo's own docs and the workspace-root doc ----
 
+export const MAX_ROLE_LENGTH = 200
+
+/**
+ * A role comes from a repo's own docs, which may be someone else's text, and it ends up in the system prompt
+ * and in a doc Claude reads. Keep it to one short line of plain text: control characters and line breaks are
+ * dropped, whitespace collapsed, and the length capped, so a README can describe a repo but not smuggle in
+ * a block of instructions.
+ */
+export function sanitizeRole(text: string): string | null {
+  const flat = text
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (flat === '') return null
+  return flat.length > MAX_ROLE_LENGTH ? `${flat.slice(0, MAX_ROLE_LENGTH - 1).trimEnd()}…` : flat
+}
+
 async function resolveRole(deps: Deps, path: string, name: string, rootDocText: string | null): Promise<string | null> {
+  const raw = await readRole(deps, path, name, rootDocText)
+  return raw === null ? null : sanitizeRole(raw)
+}
+
+async function readRole(deps: Deps, path: string, name: string, rootDocText: string | null): Promise<string | null> {
   const fromRoot = rootDocText ? extractRepoSectionFromRootDoc(rootDocText, name) : null
   if (fromRoot) return fromRoot
 
